@@ -28,10 +28,15 @@
 
     <section class="workspace dashboard-view">
       <section class="workspace-section filter-section">
-        <div class="section-heading">
-          <p>Filter</p>
-        </div>
         <section class="filters filter-bar" aria-label="Issue filters">
+          <div class="filter-search-row">
+          <label class="search">
+            <span>Keyword Search</span>
+            <input id="keyword-search" placeholder="Search issue, user, reply..." />
+          </label>
+          <button id="refresh-button" type="button">Refresh</button>
+          </div>
+          <div class="filter-control-row">
           <label>
             <span>Year</span>
             <select id="year-filter">
@@ -48,10 +53,6 @@
               <option>HA1UV</option>
               <option>HD1</option>
             </select>
-          </label>
-          <label class="search">
-            <span>Keyword Search</span>
-            <input id="keyword-search" placeholder="Search issue, user, reply..." />
           </label>
           <label>
             <span>Module</span>
@@ -82,14 +83,11 @@
               <input id="date-to-filter" type="date" />
             </label>
           </fieldset>
-          <button id="refresh-button" type="button">Refresh</button>
+          </div>
         </section>
       </section>
 
       <section class="workspace-section metrics-section">
-        <div class="section-heading">
-          <p>Overview</p>
-        </div>
         <section id="summary" class="kpis summary-strip" aria-label="Issue summary">
           <button class="kpi total summary-card is-active" type="button" data-summary="all" aria-pressed="true">
             <span>Total</span>
