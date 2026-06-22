@@ -197,7 +197,7 @@ select {
 
 .filters {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1.75fr 1fr 1fr 1.2fr auto;
+  grid-template-columns: 0.85fr 1.05fr 1.45fr 0.95fr 0.95fr 1.7fr auto;
   gap: 12px;
   align-items: end;
 }
@@ -234,6 +234,32 @@ select {
   color: white;
   font-size: 18px;
   font-weight: 900;
+}
+
+.date-range-filter {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.date-range-filter legend {
+  grid-column: 1 / -1;
+  color: #5d6675;
+  font-size: 16px;
+  font-weight: 820;
+}
+
+.date-range-filter label {
+  gap: 7px;
+}
+
+.date-range-filter input {
+  min-width: 0;
+  padding: 0 18px;
 }
 
 .kpis {

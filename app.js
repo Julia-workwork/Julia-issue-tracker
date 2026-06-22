@@ -18,6 +18,8 @@ let activeFilters = {
   model: "All Models",
   module: "All Modules",
   severity: "All Severity",
+  dateFrom: "",
+  dateTo: "",
   search: "",
 };
 
@@ -104,6 +106,7 @@ function filterIssues(records, filters = {}) {
     if (isConcrete(filters.model, "All Models") && record.model !== filters.model) return false;
     if (isConcrete(filters.module, "All Modules") && record.module !== filters.module) return false;
     if (isConcrete(filters.severity, "All Severity") && record.severity !== filters.severity) return false;
+    if (!isWithinDateRange(record.date, filters.dateFrom, filters.dateTo)) return false;
     if (!search) return true;
 
     return [
@@ -127,6 +130,36 @@ function filterIssues(records, filters = {}) {
       .toLowerCase()
       .includes(search);
   });
+}
+
+function isWithinDateRange(dateValue, dateFrom, dateTo) {
+  const recordDate = parseDateKey(dateValue);
+  const fromDate = parseDateKey(dateFrom);
+  const toDate = parseDateKey(dateTo);
+
+  if (!fromDate && !toDate) return true;
+  if (!recordDate) return false;
+  if (fromDate && recordDate < fromDate) return false;
+  if (toDate && recordDate > toDate) return false;
+  return true;
+}
+
+function parseDateKey(value) {
+  const text = normalizeText(value);
+  if (!text) return "";
+  const isoMatch = text.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const usMatch = text.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (usMatch) {
+    const [, month, day, year] = usMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  return "";
 }
 
 function uniqueOptions(records, field) {
@@ -255,6 +288,8 @@ function readFilters() {
     model: document.getElementById("model-filter")?.value || "All Models",
     module: document.getElementById("module-filter")?.value || "All Modules",
     severity: document.getElementById("severity-filter")?.value || "All Severity",
+    dateFrom: document.getElementById("date-from-filter")?.value || "",
+    dateTo: document.getElementById("date-to-filter")?.value || "",
     search: document.getElementById("keyword-search")?.value || "",
   };
 }
@@ -475,7 +510,7 @@ function setText(id, value) {
 }
 
 function bindEvents() {
-  ["year-filter", "model-filter", "module-filter", "severity-filter", "keyword-search"].forEach((id) => {
+  ["year-filter", "model-filter", "module-filter", "severity-filter", "date-from-filter", "date-to-filter", "keyword-search"].forEach((id) => {
     document.getElementById(id)?.addEventListener("input", render);
     document.getElementById(id)?.addEventListener("change", render);
   });
