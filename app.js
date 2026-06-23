@@ -24,7 +24,11 @@ let activeFilters = {
 };
 
 function deriveStatus(row) {
-  const progress = normalizeText(row["Issue Progress"]).toLowerCase();
+  return deriveStatusFromProgress(row["Issue Progress"]);
+}
+
+function deriveStatusFromProgress(value) {
+  const progress = normalizeText(value).toLowerCase();
   if (!progress || progress === "new") return "submit";
   if (progress === "initial reply sent") return "submitted";
   if (progress === "discussion ongoing") return "progress";
@@ -37,6 +41,7 @@ function normalizeRows(rows, year) {
   if (!Array.isArray(rows) || rows.length < 2) return [];
 
   const headers = rows[0].map(normalizeText);
+  const normalizedHeaderMap = buildHeaderMap(headers);
   return rows
     .slice(2)
     .map((row, index) => {
@@ -49,29 +54,29 @@ function normalizeRows(rows, year) {
         id: `${year}-${index + 3}`,
         year,
         rowNumber: index + 3,
-        date: raw.Date || "",
-        source: raw.Source || "",
-        email: raw.Email || "",
-        userId: raw["User ID"] || "",
-        model: raw.Model || "",
-        country: raw.Country || "",
-        module: raw.Module || "",
-        keyIssue: raw["Key Issue"] || "",
-        detail: raw.Detail || "",
-        chinese: raw.Chinese || "",
-        issueType: raw["Issue Type"] || "",
-        severity: raw.Severity || "",
-        userEmotion: raw["User Emotion"] || "",
-        needsReply: raw["Needs Reply"] || "",
-        responseDate: raw["Response Date"] || "",
-        issueProgress: raw["Issue Progress"] || "",
-        handler: raw.Handler || "",
-        communicationProgress: raw["Communication Progress"] || "",
-        issueNumber: raw["Issue Number"] || "",
-        tags: raw.Tags || "",
+        date: readField(raw, row, normalizedHeaderMap, 0, ["Date"]),
+        source: readField(raw, row, normalizedHeaderMap, 1, ["Source"]),
+        email: readField(raw, row, normalizedHeaderMap, 2, ["Email"]),
+        userId: readField(raw, row, normalizedHeaderMap, 3, ["User ID", "UserID"]),
+        model: readField(raw, row, normalizedHeaderMap, 4, ["Model", "Product Model"]),
+        country: readField(raw, row, normalizedHeaderMap, 5, ["Country"]),
+        module: readField(raw, row, normalizedHeaderMap, 6, ["Module"]),
+        keyIssue: readField(raw, row, normalizedHeaderMap, 7, ["Key Issue", "KeyIssue", "Key Points"]),
+        detail: readField(raw, row, normalizedHeaderMap, 8, ["Detail"]),
+        chinese: readField(raw, row, normalizedHeaderMap, 9, ["Chinese"]),
+        issueType: readField(raw, row, normalizedHeaderMap, 10, ["Issue Type", "IssueType"]),
+        severity: readField(raw, row, normalizedHeaderMap, 13, ["Severity"]),
+        userEmotion: readField(raw, row, normalizedHeaderMap, 14, ["User Emotion", "Emotion"]),
+        needsReply: readField(raw, row, normalizedHeaderMap, 15, ["Needs Reply"]),
+        responseDate: readField(raw, row, normalizedHeaderMap, 19, ["Response Date"]),
+        issueProgress: readField(raw, row, normalizedHeaderMap, 20, ["Issue Progress"]),
+        handler: readField(raw, row, normalizedHeaderMap, 21, ["Handler"]),
+        communicationProgress: readField(raw, row, normalizedHeaderMap, 22, ["Communication Progress"]),
+        issueNumber: readField(raw, row, normalizedHeaderMap, 24, ["Issue Number", "Issue #"]),
+        tags: readField(raw, row, normalizedHeaderMap, 25, ["Tags"]),
       };
 
-      record.status = deriveStatus(raw);
+      record.status = deriveStatusFromProgress(record.issueProgress);
       return record;
     })
     .filter((record) =>
@@ -84,6 +89,33 @@ function normalizeRows(rows, year) {
         record.issueNumber,
       ].some(Boolean),
     );
+}
+
+function buildHeaderMap(headers) {
+  return headers.reduce((map, header, index) => {
+    const key = normalizeHeaderKey(header);
+    if (key && !map.has(key)) map.set(key, index);
+    return map;
+  }, new Map());
+}
+
+function readField(raw, row, headerMap, fallbackIndex, names) {
+  for (const name of names) {
+    const directValue = raw[name];
+    if (directValue) return directValue;
+
+    const mappedIndex = headerMap.get(normalizeHeaderKey(name));
+    if (mappedIndex !== undefined) {
+      const mappedValue = normalizeText(row[mappedIndex]);
+      if (mappedValue) return mappedValue;
+    }
+  }
+
+  return normalizeText(row[fallbackIndex]);
+}
+
+function normalizeHeaderKey(value) {
+  return normalizeText(value).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function summarizeIssues(records) {
@@ -345,7 +377,7 @@ function renderIssueCard(record) {
   const issueNumberDetail = record.issueNumber
     ? `<dd>${escapeHtml(record.issueNumber)}</dd>`
     : `<dd class="missing">Missing</dd>`;
-  const title = record.keyIssue || record.chinese || record.detail || "No key issue";
+  const title = record.keyIssue || "Key issue missing";
 
   return `
     <article class="issue-card feedback-card" role="button" tabindex="0" data-record-id="${escapeHtml(record.id)}" aria-label="Open issue detail">
@@ -541,6 +573,7 @@ const JuliaIssueTracker = {
   formatPercent,
   googleTableToRows,
   normalizeRows,
+  renderIssueCard,
   renderDetailHtml,
   renderNewIssueHtml,
   summarizeIssues,
