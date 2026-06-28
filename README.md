@@ -1,30 +1,33 @@
 # Julia's Issue Tracker
 
-Public GitHub Pages build for Julia's HAM user issue tracking dashboard.
+Official static web output for the HAM user issue tracking dashboard.
 
-## GitHub Pages
+Open `index.html` in a browser to view the page.
 
-Recommended repository name:
+Current status:
+- Static HTML/CSS/JavaScript web page.
+- Google Sheet live read-only data is connected.
+- Reads the `2026` and `2025` tabs from `HAM User Issue`.
+- Detail cards are editable in the browser.
+- Writing edits back to Google Sheet uses `google-apps-script/issue-tracker-updates.gs`.
+- Deploy the Apps Script as a web app, then paste its `/exec` URL into `GOOGLE_APPS_SCRIPT_URL` in `app.js`.
+- `preview.png` is the latest visual screenshot.
 
-`Julia-issue-tracker`
+Apps Script editing setup:
+1. Create a Google Apps Script project.
+2. Paste `google-apps-script/issue-tracker-updates.gs`.
+3. Add Script Property `JULIA_ISSUE_USERS_JSON`, for example:
 
-Expected public URL:
+```json
+{
+  "Julia": {
+    "username": "Julia",
+    "password": "your-password",
+    "role": "Admin",
+    "active": true
+  }
+}
+```
 
-`https://julia-workwork.github.io/Julia-issue-tracker/`
-
-## Google Sheet Access
-
-This page reads live data from the `HAM User Issue` Google Sheet:
-
-`1lCFXw1kRPyBNs2zUc9LMA063v1AHAbehxRMezyLW1FU`
-
-For public visitors to see data, the Google Sheet must be shared as:
-
-`Anyone with the link can view`
-
-## Current Scope
-
-- Live read-only Google Sheet data.
-- Reads the `2026` and `2025` tabs.
-- Supports filters, summary cards, issue detail drawer, and a New Issue draft drawer.
-- Writing new issues back to Google Sheet is not connected yet.
+4. Deploy as a web app with access set to anyone with the link.
+5. Copy the web app `/exec` URL into `GOOGLE_APPS_SCRIPT_URL`.
