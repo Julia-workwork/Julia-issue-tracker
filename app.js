@@ -1,5 +1,7 @@
 const SPREADSHEET_ID = "1lCFXw1kRPyBNs2zUc9LMA063v1AHAbehxRMezyLW1FU";
 const SHEET_NAMES = ["2026", "2025"];
+const SHEET_LOAD_TIMEOUT_MS = 20000;
+const SHEET_RETRY_DELAYS_MS = [900, 2200];
 
 const STATUSES = [
   { key: "submit", label: "To Submit", className: "submit" },
@@ -236,20 +238,36 @@ function googleTableToRows(table) {
   return bodyRows;
 }
 
-function loadSheet(sheetName) {
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function loadSheet(sheetName, attempt = 0) {
+  return loadSheetOnce(sheetName, attempt).catch((error) => {
+    const delay = SHEET_RETRY_DELAYS_MS[attempt];
+    if (delay === undefined) throw error;
+    return wait(delay).then(() => loadSheet(sheetName, attempt + 1));
+  });
+}
+
+function loadSheetOnce(sheetName, attempt) {
   return new Promise((resolve, reject) => {
     const callbackName = `__juliaIssueSheet_${sheetName}_${Date.now()}_${Math.random()
       .toString(16)
       .slice(2)}`;
     const url = new URL(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq`);
     url.searchParams.set("sheet", sheetName);
+    url.searchParams.set("tq", "select *");
     url.searchParams.set("tqx", `out:json;responseHandler:${callbackName}`);
+    url.searchParams.set("_", `${Date.now()}-${attempt}`);
 
     const script = document.createElement("script");
     const timeout = window.setTimeout(() => {
       cleanup();
       reject(new Error(`Google Sheet ${sheetName} did not respond. Check sharing access.`));
-    }, 12000);
+    }, SHEET_LOAD_TIMEOUT_MS);
 
     function cleanup() {
       window.clearTimeout(timeout);
@@ -276,24 +294,41 @@ function loadSheet(sheetName) {
   });
 }
 
+function mergeSheetResults(results) {
+  const records = results
+    .filter((result) => result.status === "fulfilled")
+    .flatMap((result) => result.value);
+  const failures = results.filter((result) => result.status === "rejected");
+  const firstError = failures[0]?.reason;
+
+  return {
+    records,
+    failedSheets: failures.length,
+    ok: records.length > 0,
+    message: firstError?.message || "Unable to load Google Sheets data.",
+  };
+}
+
 async function loadIssues() {
   setSyncStatus("Syncing", false);
   setBoardMessage("Loading Google Sheets data...");
 
-  try {
-    const records = (await Promise.all(SHEET_NAMES.map(loadSheet))).flat();
-    allIssues = records;
-    populateFilters(records);
+  const result = mergeSheetResults(await Promise.allSettled(SHEET_NAMES.map(loadSheet)));
+
+  if (result.ok) {
+    allIssues = result.records;
+    populateFilters(result.records);
     render();
-    setSyncStatus("Synced", true);
-  } catch (error) {
-    console.error(error);
+    setSyncStatus(result.failedSheets ? "Partial Sync" : "Synced", !result.failedSheets);
+    return;
+  }
+
+  console.error(result.message);
     allIssues = [];
     setSyncStatus("Sheet Error", false);
     renderKpis([]);
     renderBoard([]);
-    setBoardMessage(error.message || "Unable to load Google Sheets data.");
-  }
+    setBoardMessage(result.message);
 }
 
 function populateFilters(records) {
@@ -572,6 +607,7 @@ const JuliaIssueTracker = {
   filterIssues,
   formatPercent,
   googleTableToRows,
+  mergeSheetResults,
   normalizeRows,
   renderIssueCard,
   renderDetailHtml,
