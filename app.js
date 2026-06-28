@@ -2,6 +2,7 @@ const SPREADSHEET_ID = "1lCFXw1kRPyBNs2zUc9LMA063v1AHAbehxRMezyLW1FU";
 const SHEET_NAMES = ["2026", "2025"];
 const SHEET_LOAD_TIMEOUT_MS = 20000;
 const SHEET_RETRY_DELAYS_MS = [900, 2200];
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyLwc3xOE7DjChft0u7Gyhx9q2Yy98sHCTrsHI5s8GZxzY-Ca-HyA95yX4FjCNkhEun/exec";
 
 const STATUSES = [
   { key: "submit", label: "To Submit", className: "submit" },
@@ -12,6 +13,35 @@ const STATUSES = [
 ];
 
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
+
+const EDITABLE_FIELD_DEFS = [
+  { header: "Date", key: "date", type: "input", inputType: "text" },
+  { header: "Source", key: "source", type: "input" },
+  { header: "Email", key: "email", type: "input" },
+  { header: "User ID", key: "userId", type: "input" },
+  { header: "Model", key: "model", type: "input" },
+  { header: "Country", key: "country", type: "input" },
+  { header: "Module", key: "module", type: "select", options: ["", "Hardware", "Firmware", "APP", "CPS", "Accessories", "Account", "Logistics", "After-sales", "Purchase Inquiry", "Other"] },
+  { header: "Issue Type", key: "issueType", type: "select", options: ["", "Inquiry", "Bug", "Complaint", "Feature Request", "After-sales", "Purchase", "Other"] },
+  { header: "Severity", key: "severity", type: "select", options: ["", "High", "Medium", "Low"] },
+  { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
+  { header: "Needs Reply", key: "needsReply", type: "select", options: ["", "Yes", "No"] },
+  { header: "Response Date", key: "responseDate", type: "input", inputType: "text" },
+  { header: "Issue Progress", key: "issueProgress", type: "select", options: ["", "New", "Initial reply sent", "Discussion ongoing", "Closed", "Archived"] },
+  { header: "Handler", key: "handler", type: "input" },
+  { header: "Communication Progress", key: "communicationProgress", type: "textarea", rows: 2, size: "wide" },
+  { header: "Issue Number", key: "issueNumber", type: "input" },
+  { header: "Tags", key: "tags", type: "input", size: "wide" },
+  { header: "Key Issue", key: "keyIssue", type: "textarea", rows: 3, size: "wide" },
+  { header: "Detail", key: "detail", type: "textarea", rows: 5, size: "wide" },
+  { header: "Chinese", key: "chinese", type: "textarea", rows: 5, size: "wide" },
+  { header: "Suggested Reply", key: "suggestedReply", type: "textarea", rows: 4, size: "wide" },
+  { header: "Info Needed", key: "infoNeeded", type: "textarea", rows: 3, size: "wide" },
+  { header: "Internal Recommendation", key: "internalRecommendation", type: "textarea", rows: 3, size: "wide" },
+  { header: "More Info", key: "moreInfo", type: "textarea", rows: 3, size: "wide" },
+];
+
+const FIELD_TO_RECORD_KEY = Object.fromEntries(EDITABLE_FIELD_DEFS.map((field) => [field.header, field.key]));
 
 let allIssues = [];
 let summaryFilter = "all";
@@ -67,15 +97,24 @@ function normalizeRows(rows, year) {
         detail: readField(raw, row, normalizedHeaderMap, 8, ["Detail"]),
         chinese: readField(raw, row, normalizedHeaderMap, 9, ["Chinese"]),
         issueType: readField(raw, row, normalizedHeaderMap, 10, ["Issue Type", "IssueType"]),
+        firmwareVersion: readField(raw, row, normalizedHeaderMap, 11, ["Firmware Version"]),
+        appCpsVersion: readField(raw, row, normalizedHeaderMap, 12, ["APP/CPS Version", "APP CPS Version"]),
         severity: readField(raw, row, normalizedHeaderMap, 13, ["Severity"]),
         userEmotion: readField(raw, row, normalizedHeaderMap, 14, ["User Emotion", "Emotion"]),
         needsReply: readField(raw, row, normalizedHeaderMap, 15, ["Needs Reply"]),
+        suggestedReply: readField(raw, row, normalizedHeaderMap, 16, ["Suggested Reply"]),
+        infoNeeded: readField(raw, row, normalizedHeaderMap, 17, ["Info Needed"]),
+        internalRecommendation: readField(raw, row, normalizedHeaderMap, 18, ["Internal Recommendation"]),
         responseDate: readField(raw, row, normalizedHeaderMap, 19, ["Response Date"]),
         issueProgress: readField(raw, row, normalizedHeaderMap, 20, ["Issue Progress"]),
         handler: readField(raw, row, normalizedHeaderMap, 21, ["Handler"]),
         communicationProgress: readField(raw, row, normalizedHeaderMap, 22, ["Communication Progress"]),
+        moreInfo: readField(raw, row, normalizedHeaderMap, 23, ["More Info"]),
         issueNumber: readField(raw, row, normalizedHeaderMap, 24, ["Issue Number", "Issue #"]),
         tags: readField(raw, row, normalizedHeaderMap, 25, ["Tags"]),
+        lastModifiedAt: readField(raw, row, normalizedHeaderMap, undefined, ["Last Modified At"]),
+        lastModifiedBy: readField(raw, row, normalizedHeaderMap, undefined, ["Last Modified By"]),
+        editLog: readField(raw, row, normalizedHeaderMap, undefined, ["Edit Log"]),
       };
 
       record.status = deriveStatusFromProgress(record.issueProgress);
@@ -218,6 +257,39 @@ function escapeHtml(value) {
     };
     return entities[char];
   });
+}
+
+function editableIssueValues(record) {
+  return EDITABLE_FIELD_DEFS.reduce((values, field) => {
+    values[field.header] = normalizeText(record[field.key]);
+    return values;
+  }, {});
+}
+
+function changedIssueFields(record, currentValues) {
+  const original = editableIssueValues(record);
+  return Object.entries(currentValues).reduce((changes, [field, value]) => {
+    if (!Object.prototype.hasOwnProperty.call(original, field)) return changes;
+    const nextValue = normalizeText(value);
+    if ((original[field] || "") !== nextValue) {
+      changes[field] = nextValue;
+    }
+    return changes;
+  }, {});
+}
+
+function updateIssueRecordLocally(record, { changes = {}, result = {} } = {}) {
+  Object.entries(changes).forEach(([field, value]) => {
+    const key = FIELD_TO_RECORD_KEY[field];
+    if (key) record[key] = normalizeText(value);
+  });
+  if (changes["Issue Progress"] !== undefined) {
+    record.status = deriveStatusFromProgress(changes["Issue Progress"]);
+  }
+  if (result.lastModifiedAt !== undefined) record.lastModifiedAt = normalizeText(result.lastModifiedAt);
+  if (result.lastModifiedBy !== undefined) record.lastModifiedBy = normalizeText(result.lastModifiedBy);
+  if (result.editLog !== undefined) record.editLog = normalizeText(result.editLog);
+  return record;
 }
 
 function isConcrete(value, allLabel) {
@@ -453,27 +525,44 @@ function renderDetailHtml(record) {
       <button class="close-detail" type="button" aria-label="Close detail">×</button>
     </div>
     <dl class="detail-list">
-      ${detailRow("Date", record.date)}
-      ${detailRow("Source", record.source)}
-      ${detailRow("Email", record.email)}
-      ${detailRow("User ID", record.userId)}
-      ${detailRow("Model", record.model)}
-      ${detailRow("Country", record.country)}
-      ${detailRow("Module", record.module)}
-      ${detailRow("Issue Type", record.issueType)}
-      ${detailRow("Severity", record.severity)}
-      ${detailRow("User Emotion", record.userEmotion)}
-      ${detailRow("Needs Reply", record.needsReply)}
-      ${detailRow("Issue Progress", record.issueProgress)}
-      ${detailRow("Handler", record.handler)}
-      ${detailRow("Communication Progress", record.communicationProgress)}
-      ${detailRow("Issue Number", record.issueNumber || "Missing")}
-      ${detailRow("Tags", record.tags)}
-      ${detailRow("Key Issue", record.keyIssue, "wide")}
-      ${detailRow("Detail", record.detail, "wide")}
-      ${detailRow("Chinese", record.chinese, "wide")}
+      ${EDITABLE_FIELD_DEFS.map((field) => editableDetailRow(field, record)).join("")}
+      ${detailRow("Firmware Version", record.firmwareVersion)}
+      ${detailRow("APP/CPS Version", record.appCpsVersion)}
+      ${detailRow("Last Modified At", record.lastModifiedAt)}
+      ${detailRow("Last Modified By", record.lastModifiedBy)}
+      ${detailRow("Edit Log", record.editLog, "wide")}
     </dl>
+    <button class="save-detail-changes" type="button">Save Changes</button>
   `;
+}
+
+function editableDetailRow(field, record) {
+  const value = normalizeText(record[field.key]);
+  const size = field.size === "wide" ? "detail-row-wide" : "";
+  return `
+    <div class="detail-editable-row ${size}">
+      <dt>${escapeHtml(field.header)}</dt>
+      <dd>${fieldInputHtml(field, value)}</dd>
+    </div>
+  `;
+}
+
+function fieldInputHtml(field, value) {
+  if (field.type === "select") {
+    return `
+      <select name="${escapeHtml(field.header)}">
+        ${field.options
+          .map((option) => `<option value="${escapeHtml(option)}"${value === option ? " selected" : ""}>${escapeHtml(option || "-")}</option>`)
+          .join("")}
+      </select>
+    `;
+  }
+
+  if (field.type === "textarea") {
+    return `<textarea name="${escapeHtml(field.header)}" rows="${field.rows || 3}">${escapeHtml(value)}</textarea>`;
+  }
+
+  return `<input name="${escapeHtml(field.header)}" type="${escapeHtml(field.inputType || "text")}" value="${escapeHtml(value)}" />`;
 }
 
 function renderNewIssueHtml() {
@@ -528,6 +617,7 @@ function openDetailById(id) {
   const record = allIssues.find((issue) => issue.id === id);
   if (!record) return;
   openDrawer(renderDetailHtml(record));
+  bindDetailEditEvents(record);
 }
 
 function openNewIssue() {
@@ -549,6 +639,158 @@ function closeDrawer() {
   document.getElementById("detail-panel")?.classList.add("is-hidden");
   document.getElementById("detail-backdrop")?.classList.add("is-hidden");
   document.body.classList.remove("detail-open");
+}
+
+function detailFieldValues() {
+  const panel = document.getElementById("detail-panel");
+  if (!panel) return {};
+  return [...panel.querySelectorAll(".detail-editable-row input, .detail-editable-row select, .detail-editable-row textarea")].reduce(
+    (values, field) => {
+      values[field.name] = normalizeText(field.value);
+      return values;
+    },
+    {},
+  );
+}
+
+function bindDetailEditEvents(record) {
+  document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
+    const changes = changedIssueFields(record, detailFieldValues());
+    if (!Object.keys(changes).length) {
+      showToast("No changes to save");
+      return;
+    }
+
+    const confirmed = window.confirm(`Confirm changes?\n\n${changesSummary(record, changes)}`);
+    if (!confirmed) return;
+
+    setDetailSaving(true);
+    try {
+      const result = await syncIssueChangesToGoogleSheet(record, changes);
+      updateIssueRecordLocally(record, { changes, result });
+      render();
+      openDrawer(renderDetailHtml(record));
+      bindDetailEditEvents(record);
+      showToast("Changes saved");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setDetailSaving(false);
+    }
+  });
+}
+
+function setDetailSaving(isSaving) {
+  const panel = document.getElementById("detail-panel");
+  const button = panel?.querySelector(".save-detail-changes");
+  const fields = panel?.querySelectorAll(".detail-editable-row input, .detail-editable-row select, .detail-editable-row textarea") || [];
+  if (button) {
+    button.disabled = isSaving;
+    button.textContent = isSaving ? "Saving..." : "Save Changes";
+  }
+  fields.forEach((field) => {
+    field.disabled = isSaving;
+  });
+}
+
+function changesSummary(record, changes) {
+  const original = editableIssueValues(record);
+  return Object.entries(changes)
+    .map(([field, value]) => `${field}: ${original[field] || "-"} -> ${value || "-"}`)
+    .join("\n");
+}
+
+async function syncIssueChangesToGoogleSheet(record, changes) {
+  if (!GOOGLE_APPS_SCRIPT_URL) {
+    throw new Error("Google Apps Script URL is not configured yet.");
+  }
+  const authToken = await ensureAuthToken();
+  return callAppsScript({
+    action: "updateIssueFields",
+    authToken,
+    match: JSON.stringify({ year: record.year, rowNumber: record.rowNumber }),
+    changes: JSON.stringify(changes),
+  });
+}
+
+async function ensureAuthToken() {
+  const existing = window.localStorage?.getItem("juliaIssueAuthToken");
+  if (existing) return existing;
+
+  const username = window.prompt("Account");
+  if (!username) throw new Error("Account is required.");
+  const password = window.prompt("Password");
+  if (!password) throw new Error("Password is required.");
+  const passwordHash = await hashCredential(username, password);
+  const result = await callAppsScript({ action: "login", username, passwordHash });
+  if (!result.ok || !result.token) {
+    throw new Error(result.message || "Login failed.");
+  }
+  window.localStorage?.setItem("juliaIssueAuthToken", result.token);
+  setText("sync-status", result.role ? `${result.role} Synced` : "Synced");
+  return result.token;
+}
+
+async function hashCredential(username, password) {
+  const text = `${normalizeText(username).toLowerCase()}:${String(password || "")}`;
+  const bytes = new TextEncoder().encode(text);
+  const hash = await window.crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function callAppsScript(params) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__juliaIssueWrite_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const url = new URL(GOOGLE_APPS_SCRIPT_URL);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+    url.searchParams.set("callback", callbackName);
+
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Save request timed out."));
+    }, 20000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      script.remove();
+      delete window[callbackName];
+    }
+
+    window[callbackName] = (payload) => {
+      cleanup();
+      if (!payload?.ok) {
+        reject(new Error(payload?.message || "Save failed."));
+        return;
+      }
+      resolve(payload);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("Unable to reach Google Apps Script."));
+    };
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
+}
+
+function showToast(message) {
+  let toast = document.getElementById("toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "toast";
+    toast.className = "toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add("is-visible");
+  window.clearTimeout(showToast.timeout);
+  showToast.timeout = window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+  }, 2800);
 }
 
 function setBoardMessage(message) {
@@ -602,7 +844,9 @@ function bindEvents() {
 }
 
 const JuliaIssueTracker = {
+  changedIssueFields,
   deriveStatus,
+  editableIssueValues,
   escapeHtml,
   filterIssues,
   formatPercent,
@@ -613,6 +857,7 @@ const JuliaIssueTracker = {
   renderDetailHtml,
   renderNewIssueHtml,
   summarizeIssues,
+  updateIssueRecordLocally,
   uniqueOptions,
 };
 
