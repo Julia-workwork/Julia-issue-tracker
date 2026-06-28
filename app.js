@@ -15,14 +15,6 @@ const STATUSES = [
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
 
 const EDITABLE_FIELD_DEFS = [
-  { header: "Date", key: "date", type: "input", inputType: "text" },
-  { header: "Source", key: "source", type: "input" },
-  { header: "Email", key: "email", type: "input" },
-  { header: "User ID", key: "userId", type: "input" },
-  { header: "Model", key: "model", type: "input" },
-  { header: "Country", key: "country", type: "input" },
-  { header: "Module", key: "module", type: "select", options: ["", "Hardware", "Firmware", "APP", "CPS", "Accessories", "Account", "Logistics", "After-sales", "Purchase Inquiry", "Other"] },
-  { header: "Issue Type", key: "issueType", type: "select", options: ["", "Inquiry", "Bug", "Complaint", "Feature Request", "After-sales", "Purchase", "Other"] },
   { header: "Severity", key: "severity", type: "select", options: ["", "High", "Medium", "Low"] },
   { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
   { header: "Needs Reply", key: "needsReply", type: "select", options: ["", "Yes", "No"] },
@@ -32,9 +24,6 @@ const EDITABLE_FIELD_DEFS = [
   { header: "Communication Progress", key: "communicationProgress", type: "textarea", rows: 2, size: "wide" },
   { header: "Issue Number", key: "issueNumber", type: "input" },
   { header: "Tags", key: "tags", type: "input", size: "wide" },
-  { header: "Key Issue", key: "keyIssue", type: "textarea", rows: 3, size: "wide" },
-  { header: "Detail", key: "detail", type: "textarea", rows: 5, size: "wide" },
-  { header: "Chinese", key: "chinese", type: "textarea", rows: 5, size: "wide" },
   { header: "Suggested Reply", key: "suggestedReply", type: "textarea", rows: 4, size: "wide" },
   { header: "Info Needed", key: "infoNeeded", type: "textarea", rows: 3, size: "wide" },
   { header: "Internal Recommendation", key: "internalRecommendation", type: "textarea", rows: 3, size: "wide" },
@@ -507,24 +496,32 @@ function renderIssueCard(record) {
 }
 
 function renderDetailHtml(record) {
-  const chips = [
-    record.module ? `<span>${escapeHtml(record.module)}</span>` : "",
-    record.severity ? `<span class="${record.severity.toLowerCase() === "high" ? "high" : ""}">${escapeHtml(record.severity)}</span>` : "",
-    record.userEmotion ? `<span>${escapeHtml(record.userEmotion)}</span>` : "",
-  ]
-    .filter(Boolean)
-    .join("");
+  const meta = [record.date, record.userId || record.handler].filter(Boolean).join(" · ");
 
   return `
     <div class="detail-panel__header">
-      <div>
-        <div class="chips">${chips}</div>
-        <p class="detail-kicker">${escapeHtml(record.model || "Issue")} · ${escapeHtml(STATUS_LABELS.get(record.status) || record.status)}</p>
-        <h2>${escapeHtml(record.keyIssue || record.chinese || record.detail || "Issue detail")}</h2>
+      <div class="detail-header-tags">
+        ${detailTag(record.model, "model")}
+        ${detailTag(record.issueType)}
+        ${detailTag(record.module)}
+        ${detailTag(record.severity)}
+        ${detailTag(record.userEmotion)}
       </div>
-      <button class="close-detail" type="button" aria-label="Close detail">×</button>
+      <div class="detail-actions">
+        <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
+        <button class="close-detail" type="button" aria-label="Close detail">Close</button>
+      </div>
     </div>
-    <dl class="detail-list">
+    <section class="detail-summary-card">
+      <span class="status-pill">${escapeHtml(STATUS_LABELS.get(record.status) || record.issueProgress || "To Submit")}</span>
+      <h2>${escapeHtml(record.keyIssue || "Issue detail")}</h2>
+      ${meta ? `<p>${escapeHtml(meta)}</p>` : ""}
+    </section>
+    <section class="detail-readonly-section">
+      ${readonlyDetailBlock("Original Feedback", record.detail)}
+      ${readonlyDetailBlock("Chinese", record.chinese)}
+    </section>
+    <dl class="detail-list detail-edit-grid">
       ${EDITABLE_FIELD_DEFS.map((field) => editableDetailRow(field, record)).join("")}
       ${detailRow("Firmware Version", record.firmwareVersion)}
       ${detailRow("APP/CPS Version", record.appCpsVersion)}
@@ -533,6 +530,21 @@ function renderDetailHtml(record) {
       ${detailRow("Edit Log", record.editLog, "wide")}
     </dl>
     <button class="save-detail-changes" type="button">Save Changes</button>
+  `;
+}
+
+function detailTag(value, type = "") {
+  const text = normalizeText(value);
+  if (!text) return "";
+  return `<span class="detail-tag ${type ? `detail-tag--${escapeHtml(type)}` : ""}">${escapeHtml(text)}</span>`;
+}
+
+function readonlyDetailBlock(label, value) {
+  return `
+    <article>
+      <h3>${escapeHtml(label)}</h3>
+      <p>${escapeHtml(value || "-")}</p>
+    </article>
   `;
 }
 
@@ -654,6 +666,11 @@ function detailFieldValues() {
 }
 
 function bindDetailEditEvents(record) {
+  document.querySelector(".copy-detail-summary")?.addEventListener("click", async () => {
+    await copyEngineerSummary(record);
+    showToast("Engineer summary copied");
+  });
+
   document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
     const changes = changedIssueFields(record, detailFieldValues());
     if (!Object.keys(changes).length) {
@@ -678,6 +695,25 @@ function bindDetailEditEvents(record) {
       setDetailSaving(false);
     }
   });
+}
+
+async function copyEngineerSummary(record) {
+  const text = [
+    `Key Issue: ${record.keyIssue || "-"}`,
+    `Model: ${record.model || "-"}`,
+    `Module: ${record.module || "-"}`,
+    `Issue Type: ${record.issueType || "-"}`,
+    `Severity: ${record.severity || "-"}`,
+    `Issue Progress: ${record.issueProgress || STATUS_LABELS.get(record.status) || "-"}`,
+    `Issue Number: ${record.issueNumber || "-"}`,
+    `Original Feedback: ${record.detail || "-"}`,
+    `Chinese: ${record.chinese || "-"}`,
+  ].join("\n");
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+  }
+  return text;
 }
 
 function setDetailSaving(isSaving) {
