@@ -45,16 +45,22 @@ let activeFilters = {
 };
 
 function deriveStatus(row) {
-  return deriveStatusFromProgress(row["Issue Progress"]);
+  return deriveStatusFromFields(row["Issue Progress"], row["Issue Number"]);
 }
 
 function deriveStatusFromProgress(value) {
-  const progress = normalizeText(value).toLowerCase();
-  if (!progress || progress === "new") return "submit";
-  if (progress === "initial reply sent") return "submitted";
+  return deriveStatusFromFields(value, "");
+}
+
+function deriveStatusFromFields(progressValue, issueNumberValue) {
+  const progress = normalizeText(progressValue).toLowerCase();
+  const issueNumber = normalizeText(issueNumberValue);
   if (progress === "discussion ongoing") return "progress";
   if (progress === "closed") return "resolved";
   if (progress === "archived") return "archived";
+  if (progress === "initial reply sent") return "submitted";
+  if (/\d/.test(issueNumber)) return "submitted";
+  if (!progress || progress === "new") return "submit";
   return "submit";
 }
 
@@ -106,7 +112,7 @@ function normalizeRows(rows, year) {
         editLog: readField(raw, row, normalizedHeaderMap, undefined, ["Edit Log"]),
       };
 
-      record.status = deriveStatusFromProgress(record.issueProgress);
+      record.status = deriveStatusFromFields(record.issueProgress, record.issueNumber);
       return record;
     })
     .filter((record) =>
@@ -272,8 +278,8 @@ function updateIssueRecordLocally(record, { changes = {}, result = {} } = {}) {
     const key = FIELD_TO_RECORD_KEY[field];
     if (key) record[key] = normalizeText(value);
   });
-  if (changes["Issue Progress"] !== undefined) {
-    record.status = deriveStatusFromProgress(changes["Issue Progress"]);
+  if (changes["Issue Progress"] !== undefined || changes["Issue Number"] !== undefined) {
+    record.status = deriveStatusFromFields(record.issueProgress, record.issueNumber);
   }
   if (result.lastModifiedAt !== undefined) record.lastModifiedAt = normalizeText(result.lastModifiedAt);
   if (result.lastModifiedBy !== undefined) record.lastModifiedBy = normalizeText(result.lastModifiedBy);
