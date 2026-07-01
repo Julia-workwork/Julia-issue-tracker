@@ -2,7 +2,7 @@ const SPREADSHEET_ID = "1lCFXw1kRPyBNs2zUc9LMA063v1AHAbehxRMezyLW1FU";
 const SHEET_NAMES = ["2026", "2025"];
 const SHEET_LOAD_TIMEOUT_MS = 20000;
 const SHEET_RETRY_DELAYS_MS = [900, 2200];
-const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyLwc3xOE7DjChft0u7Gyhx9q2Yy98sHCTrsHI5s8GZxzY-Ca-HyA95yX4FjCNkhEun/exec";
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUJRPV65kwDEOv5awlrg3XCTett9KBXgX_bxLP0WlDWL8TFtl50I_zWEo3S0QUb3Bq/exec";
 const AUTH_TOKEN_KEY = "juliaIssueAuthToken";
 
 const STATUSES = [
