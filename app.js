@@ -3,6 +3,7 @@ const SHEET_NAMES = ["2026", "2025"];
 const SHEET_LOAD_TIMEOUT_MS = 20000;
 const SHEET_RETRY_DELAYS_MS = [900, 2200];
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyLwc3xOE7DjChft0u7Gyhx9q2Yy98sHCTrsHI5s8GZxzY-Ca-HyA95yX4FjCNkhEun/exec";
+const AUTH_TOKEN_KEY = "juliaIssueAuthToken";
 
 const STATUSES = [
   { key: "submit", label: "To Submit", className: "submit" },
@@ -747,28 +748,36 @@ async function syncIssueChangesToGoogleSheet(record, changes) {
     throw new Error("Google Apps Script URL is not configured yet.");
   }
   const authToken = await ensureAuthToken();
-  return callAppsScript({
-    action: "updateIssueFields",
-    authToken,
-    match: JSON.stringify({ year: record.year, rowNumber: record.rowNumber }),
-    changes: JSON.stringify(changes),
-  });
+  try {
+    return await callAppsScript({
+      action: "updateIssueFields",
+      authToken,
+      match: JSON.stringify({ year: record.year, rowNumber: record.rowNumber }),
+      changes: JSON.stringify(changes),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/session|permission|invalid account|password|sign in/i.test(message)) {
+      window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    }
+    throw error;
+  }
 }
 
 async function ensureAuthToken() {
-  const existing = window.localStorage?.getItem("juliaIssueAuthToken");
+  const existing = window.localStorage?.getItem(AUTH_TOKEN_KEY);
   if (existing) return existing;
 
-  const username = window.prompt("Account");
+  const username = window.prompt("Issue Tracker Account (not Google)");
   if (!username) throw new Error("Account is required.");
-  const password = window.prompt("Password");
+  const password = window.prompt("Issue Tracker Password");
   if (!password) throw new Error("Password is required.");
   const passwordHash = await hashCredential(username, password);
   const result = await callAppsScript({ action: "login", username, passwordHash });
   if (!result.ok || !result.token) {
     throw new Error(result.message || "Login failed.");
   }
-  window.localStorage?.setItem("juliaIssueAuthToken", result.token);
+  window.localStorage?.setItem(AUTH_TOKEN_KEY, result.token);
   setText("sync-status", result.role ? `${result.role} Synced` : "Synced");
   return result.token;
 }
