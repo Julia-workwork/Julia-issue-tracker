@@ -16,6 +16,7 @@ const STATUSES = [
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
 
 const EDITABLE_FIELD_DEFS = [
+  { header: "Key Issue", key: "keyIssue", type: "textarea", rows: 3, size: "wide" },
   { header: "Severity", key: "severity", type: "select", options: ["", "High", "Medium", "Low"] },
   { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
   { header: "Needs Reply", key: "needsReply", type: "select", options: ["", "Yes", "No"] },
@@ -681,7 +682,7 @@ function bindDetailEditEvents(record) {
   document.querySelector(".save-detail-changes")?.addEventListener("click", async () => {
     const changes = changedIssueFields(record, detailFieldValues());
     if (!Object.keys(changes).length) {
-      showToast("No changes to save");
+      showToast("No editable changes to save.");
       return;
     }
 
