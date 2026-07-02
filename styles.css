@@ -558,6 +558,97 @@ select {
   border-color: #9ec2ff;
   background: white;
   color: #005ecb;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 950;
+}
+
+.detail-tag--issue-type {
+  border-color: #f2c7c3;
+  background: #fff1ef;
+  color: #b42318;
+}
+
+.detail-tag--featurerequest {
+  border-color: #b8d8b5;
+  background: #eef8eb;
+  color: #246b2a;
+}
+
+.detail-tag--featureenhancement {
+  border-color: #b9d7e8;
+  background: #edf7fc;
+  color: #23607c;
+}
+
+.detail-tag--question,
+.detail-tag--compatibility,
+.detail-tag--documentation {
+  border-color: #c8d1dd;
+  background: #f5f7fb;
+  color: #344054;
+}
+
+.detail-tag--module {
+  border-color: #b9d8ff;
+  background: #eef6ff;
+  color: #005ecb;
+}
+
+.detail-tag--app,
+.detail-tag--cps {
+  border-color: #c8d7ff;
+  background: #f1f5ff;
+  color: #284da8;
+}
+
+.detail-tag--hardware {
+  border-color: #d5c7f7;
+  background: #f5f0ff;
+  color: #5b35b1;
+}
+
+.detail-tag--severity {
+  border-color: #ead7a1;
+  background: #fff8e1;
+  color: #8a5a00;
+}
+
+.detail-tag--high,
+.detail-tag--urgent {
+  border-color: #ffb4ab;
+  background: #fff0ee;
+  color: #c0261d;
+}
+
+.detail-tag--medium,
+.detail-tag--dissatisfied,
+.detail-tag--frustrated {
+  border-color: #ffd596;
+  background: #fff7e8;
+  color: #b45f00;
+}
+
+.detail-tag--low,
+.detail-tag--calm {
+  border-color: #b7dfbf;
+  background: #eef9f0;
+  color: #20733a;
+}
+
+.detail-tag--emotion {
+  border-color: #d7dde8;
+  background: #f7f8fb;
+  color: #4b5565;
+}
+
+.detail-tag--confused,
+.detail-tag--curious {
+  border-color: #f2dc8d;
+  background: #fff9db;
+  color: #806000;
 }
 
 .close-detail {
@@ -717,6 +808,65 @@ select {
   background:
     linear-gradient(90deg, rgba(255, 196, 0, 0.12), transparent 42%),
     #fffdf6;
+}
+
+.multi-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.multi-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid #ccd4df;
+  border-radius: 999px;
+  background: white;
+  color: #20242c;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  overflow: hidden;
+}
+
+.multi-chip input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.multi-chip span {
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.multi-chip input:checked + span {
+  background: #fff1ef;
+  color: #b42318;
+  box-shadow: inset 0 0 0 1px #f2c7c3;
+}
+
+.multi-chip--featurerequest input:checked + span {
+  background: #eef8eb;
+  color: #246b2a;
+  box-shadow: inset 0 0 0 1px #b8d8b5;
+}
+
+.multi-chip--featureenhancement input:checked + span {
+  background: #edf7fc;
+  color: #23607c;
+  box-shadow: inset 0 0 0 1px #b9d7e8;
+}
+
+.multi-chip--question input:checked + span,
+.multi-chip--compatibility input:checked + span,
+.multi-chip--documentation input:checked + span {
+  background: #f5f7fb;
+  color: #344054;
+  box-shadow: inset 0 0 0 1px #c8d1dd;
 }
 
 .detail-editable-row input:focus,
