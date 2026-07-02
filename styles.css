@@ -285,18 +285,18 @@ select {
 
 .kpis {
   display: grid;
-  grid-template-columns: repeat(6, minmax(168px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, minmax(132px, 1fr));
+  gap: 12px;
 }
 
 .kpi {
-  min-height: 150px;
+  min-height: 104px;
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 22px 26px 18px;
-  border: 3px solid #111111;
-  border-radius: 38px;
+  padding: 16px 18px 14px;
+  border: 2px solid #111111;
+  border-radius: 26px;
   background: white;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.045);
   appearance: none;
@@ -320,10 +320,10 @@ select {
 .kpi::after {
   content: "";
   position: absolute;
-  top: 28px;
-  right: 26px;
-  width: 12px;
-  height: 12px;
+  top: 20px;
+  right: 18px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   background: currentColor;
 }
@@ -332,15 +332,15 @@ select {
   display: block;
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 900;
 }
 
 .kpi strong {
   display: block;
-  margin-top: 14px;
+  margin-top: 10px;
   color: var(--ink);
-  font-size: clamp(44px, 3.6vw, 68px);
+  font-size: clamp(34px, 2.8vw, 52px);
   line-height: 0.88;
   letter-spacing: 0;
 }
@@ -348,14 +348,14 @@ select {
 .kpi em {
   position: static;
   align-self: flex-end;
-  margin-top: 8px;
+  margin-top: auto;
   font-style: normal;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 900;
 }
 
 .kpi.total strong {
-  font-size: clamp(48px, 3.8vw, 72px);
+  font-size: clamp(36px, 2.9vw, 54px);
 }
 
 .submit {
@@ -937,7 +937,10 @@ dd {
     grid-column: span 2;
   }
 
-  .kpis,
+  .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .board {
     grid-template-columns: repeat(2, minmax(260px, 1fr));
   }
@@ -967,9 +970,13 @@ dd {
   .filter-search-row,
   .filter-control-row,
   .date-range-filter,
-  .kpis,
   .board {
     grid-template-columns: 1fr;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .filters button {
