@@ -14,8 +14,17 @@ const STATUSES = [
 ];
 
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
+const ISSUE_TYPE_OPTIONS = ["Bug", "Feature Request", "Feature Enhancement", "Question", "Compatibility", "Documentation"];
 
 const EDITABLE_FIELD_DEFS = [
+  { header: "Date", key: "date", type: "input", inputType: "text" },
+  { header: "Source", key: "source", type: "input" },
+  { header: "Email", key: "email", type: "input" },
+  { header: "User ID", key: "userId", type: "input" },
+  { header: "Model", key: "model", type: "input" },
+  { header: "Country", key: "country", type: "input" },
+  { header: "Module", key: "module", type: "select", options: ["", "Firmware", "CPS", "APP", "Hardware", "Accessory", "Support", "Documentation", "Other"] },
+  { header: "Issue Type", key: "issueType", type: "multi", options: ISSUE_TYPE_OPTIONS },
   { header: "Key Issue", key: "keyIssue", type: "textarea", rows: 3, size: "wide" },
   { header: "Severity", key: "severity", type: "select", options: ["", "High", "Medium", "Low"] },
   { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
@@ -297,6 +306,17 @@ function normalizeText(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function splitMultiValue(value) {
+  return normalizeText(value)
+    .split(/[,，;；]/)
+    .map(normalizeText)
+    .filter(Boolean);
+}
+
+function slugify(value) {
+  return normalizeHeaderKey(value) || "none";
+}
+
 function googleTableToRows(table) {
   const bodyRows = (table?.rows || []).map((row) =>
     (row.c || []).map((cell) => normalizeText(cell?.f ?? cell?.v)),
@@ -510,10 +530,10 @@ function renderDetailHtml(record) {
     <div class="detail-panel__header">
       <div class="detail-header-tags">
         ${detailTag(record.model, "model")}
-        ${detailTag(record.issueType)}
-        ${detailTag(record.module)}
-        ${detailTag(record.severity)}
-        ${detailTag(record.userEmotion)}
+        ${detailTags(record.issueType, "issue-type")}
+        ${detailTag(record.module, "module")}
+        ${detailTag(record.severity, "severity")}
+        ${detailTag(record.userEmotion, "emotion")}
       </div>
       <div class="detail-actions">
         <button class="copy-detail-summary" type="button">Copy Engineer Summary</button>
@@ -544,7 +564,16 @@ function renderDetailHtml(record) {
 function detailTag(value, type = "") {
   const text = normalizeText(value);
   if (!text) return "";
-  return `<span class="detail-tag ${type ? `detail-tag--${escapeHtml(type)}` : ""}">${escapeHtml(text)}</span>`;
+  const classes = ["detail-tag"];
+  if (type) classes.push(`detail-tag--${type}`);
+  classes.push(`detail-tag--${slugify(text)}`);
+  return `<span class="${classes.map(escapeHtml).join(" ")}">${escapeHtml(text)}</span>`;
+}
+
+function detailTags(value, type = "") {
+  return splitMultiValue(value)
+    .map((item) => detailTag(item, type))
+    .join("");
 }
 
 function readonlyDetailBlock(label, value) {
@@ -568,6 +597,25 @@ function editableDetailRow(field, record) {
 }
 
 function fieldInputHtml(field, value) {
+  if (field.type === "multi") {
+    const selected = new Set(splitMultiValue(value).map((item) => normalizeHeaderKey(item)));
+    return `
+      <div class="multi-chip-group" role="group" aria-label="${escapeHtml(field.header)}">
+        ${field.options
+          .map((option) => {
+            const checked = selected.has(normalizeHeaderKey(option)) ? " checked" : "";
+            return `
+              <label class="multi-chip multi-chip--${escapeHtml(slugify(option))}">
+                <input name="${escapeHtml(field.header)}" type="checkbox" value="${escapeHtml(option)}"${checked} />
+                <span>${escapeHtml(option)}</span>
+              </label>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
   if (field.type === "select") {
     return `
       <select name="${escapeHtml(field.header)}">
@@ -664,13 +712,19 @@ function closeDrawer() {
 function detailFieldValues() {
   const panel = document.getElementById("detail-panel");
   if (!panel) return {};
-  return [...panel.querySelectorAll(".detail-editable-row input, .detail-editable-row select, .detail-editable-row textarea")].reduce(
-    (values, field) => {
-      values[field.name] = normalizeText(field.value);
-      return values;
-    },
-    {},
-  );
+  const values = {};
+  panel.querySelectorAll(".detail-editable-row input, .detail-editable-row select, .detail-editable-row textarea").forEach((field) => {
+    if (field.type === "checkbox") {
+      if (!values[field.name]) values[field.name] = [];
+      if (field.checked) values[field.name].push(normalizeText(field.value));
+      return;
+    }
+    values[field.name] = normalizeText(field.value);
+  });
+  Object.entries(values).forEach(([key, value]) => {
+    if (Array.isArray(value)) values[key] = value.join(", ");
+  });
+  return values;
 }
 
 function bindDetailEditEvents(record) {
