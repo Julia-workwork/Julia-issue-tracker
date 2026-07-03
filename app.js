@@ -14,7 +14,7 @@ const STATUSES = [
 ];
 
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
-const ISSUE_TYPE_OPTIONS = ["Bug", "Feature Request", "Feature Enhancement", "Question", "Compatibility", "Documentation"];
+const ISSUE_TYPE_OPTIONS = ["", "Bug", "Inquiry", "Purchase", "Feature Request", "After-sales"];
 
 const EDITABLE_FIELD_DEFS = [
   { header: "Date", key: "date", type: "input", inputType: "text" },
@@ -24,7 +24,7 @@ const EDITABLE_FIELD_DEFS = [
   { header: "Model", key: "model", type: "input" },
   { header: "Country", key: "country", type: "input" },
   { header: "Module", key: "module", type: "select", options: ["", "Firmware", "CPS", "APP", "Hardware", "Accessory", "Support", "Documentation", "Other"] },
-  { header: "Issue Type", key: "issueType", type: "multi", options: ISSUE_TYPE_OPTIONS },
+  { header: "Issue Type", key: "issueType", type: "select", options: ISSUE_TYPE_OPTIONS },
   { header: "Key Issue", key: "keyIssue", type: "textarea", rows: 3, size: "wide" },
   { header: "Severity", key: "severity", type: "select", options: ["", "High", "Medium", "Low"] },
   { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
@@ -597,25 +597,6 @@ function editableDetailRow(field, record) {
 }
 
 function fieldInputHtml(field, value) {
-  if (field.type === "multi") {
-    const selected = new Set(splitMultiValue(value).map((item) => normalizeHeaderKey(item)));
-    return `
-      <div class="multi-chip-group" role="group" aria-label="${escapeHtml(field.header)}">
-        ${field.options
-          .map((option) => {
-            const checked = selected.has(normalizeHeaderKey(option)) ? " checked" : "";
-            return `
-              <label class="multi-chip multi-chip--${escapeHtml(slugify(option))}">
-                <input name="${escapeHtml(field.header)}" type="checkbox" value="${escapeHtml(option)}"${checked} />
-                <span>${escapeHtml(option)}</span>
-              </label>
-            `;
-          })
-          .join("")}
-      </div>
-    `;
-  }
-
   if (field.type === "select") {
     return `
       <select name="${escapeHtml(field.header)}">
@@ -649,6 +630,7 @@ function renderNewIssueHtml() {
         <label>Date<input type="date" /></label>
         <label>Model<input placeholder="HA2, HA1UV, HD1..." /></label>
         <label>Module<input placeholder="Firmware, CPS, Hardware..." /></label>
+        <label>Issue Type<select name="Issue Type">${ISSUE_TYPE_OPTIONS.filter(Boolean).map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}</select></label>
         <label>Severity<select><option>High</option><option>Medium</option><option>Low</option></select></label>
         <label>User Emotion<select><option>Confused</option><option>Dissatisfied</option><option>Urgent</option><option>Calm</option></select></label>
         <label>Issue Number<input placeholder="Generated after submission" /></label>
