@@ -958,6 +958,17 @@ select {
   text-transform: none;
 }
 
+.analyze-issue-button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--black);
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 950;
+}
+
 .new-issue-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

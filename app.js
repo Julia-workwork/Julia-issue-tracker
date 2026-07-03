@@ -317,6 +317,150 @@ function slugify(value) {
   return normalizeHeaderKey(value) || "none";
 }
 
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function analyzeRawIssue(rawText, options = {}) {
+  const detail = normalizeText(rawText);
+  const lower = detail.toLowerCase();
+  const date = extractDate(detail) || options.today || todayIsoDate();
+  const email = detail.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const model = extractModel(detail);
+  const module = classifyModule(lower);
+  const issueType = classifyIssueType(lower);
+  const severity = classifySeverity(lower, issueType);
+  const userEmotion = classifyEmotion(lower, issueType);
+  const tags = extractTags(detail, module, issueType);
+
+  return {
+    date,
+    source: email ? "Email" : "",
+    email,
+    userId: extractUserId(detail, email),
+    model,
+    country: "",
+    module,
+    issueType,
+    keyIssue: buildKeyIssue({ detail, model, module, issueType, tags }),
+    detail,
+    chinese: draftChinese(detail, { model, module, issueType, tags }),
+    severity,
+    userEmotion,
+    needsReply: "Yes",
+    responseDate: "",
+    issueProgress: "New",
+    handler: "Julia",
+    communicationProgress: "",
+    issueNumber: "",
+    tags,
+    suggestedReply: "",
+    infoNeeded: "",
+    internalRecommendation: "",
+    moreInfo: "",
+  };
+}
+
+function extractDate(text) {
+  const iso = text.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const us = text.match(/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/);
+  if (us) return `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
+  return "";
+}
+
+function extractModel(text) {
+  const match = normalizeText(text).match(/\b(HA1UV|HA1G|HA2|HD2|HD1|H1|RA89|MA1|DM-?32UV|H103|H103ML)\b/i);
+  return match ? match[1].toUpperCase().replace("DM-32UV", "DM-32UV") : "";
+}
+
+function classifyModule(lower) {
+  if (/(cps|codeplug|programming software|csv|excel|chirp)/i.test(lower)) return "CPS";
+  if (/(app|ios|android|bluetooth app|mobile app|aprsdroid)/i.test(lower)) return "APP";
+  if (/(firmware|update|upgrade|program mode|bootloader|screen|display|channel mode|dmr|audio|modulation|tx|rx|repeater|kiss|tnc|aprs)/i.test(lower)) return "Firmware";
+  if (/(antenna|battery|charging|charger|speaker|mic|microphone|knob|ptt|cable|usb|case|waterproof|hardware)/i.test(lower)) return "Hardware";
+  return "Other";
+}
+
+function classifyIssueType(lower) {
+  if (/(amazon|order|refund|return|warranty|repair|missing|arrived|shipment|delivery|defective unit|after[- ]?sales)/i.test(lower)) return "After-sales";
+  if (/(feature request|please add|wish|would like|hope|can you add|support .* in future|request)/i.test(lower)) return "Feature Request";
+  if (/(bug|problem|issue|error|fail|fails|failed|not work|doesn't work|cannot|can't|stuck|jump|skip|wrong|abnormal|no audio|not loud|interference|noise|crash)/i.test(lower)) return "Bug";
+  if (/(buy|price|in stock|stock|where can i get|where can i buy|purchase link|buy link|available|availability)/i.test(lower)) return "Purchase";
+  return "Inquiry";
+}
+
+function classifySeverity(lower, issueType) {
+  if (issueType === "After-sales") return "Medium";
+  if (/(brick|dead|cannot power|won't power|no transmit|emergency|urgent|safety|refund|replacement)/i.test(lower)) return "High";
+  if (issueType === "Bug") return "Medium";
+  return "Low";
+}
+
+function classifyEmotion(lower, issueType) {
+  if (/(urgent|asap|immediately|right now)/i.test(lower)) return "Urgent";
+  if (/(frustrat|angry|annoy|disappoint|dissatisfied|not happy)/i.test(lower)) return "Dissatisfied";
+  if (/(confus|wonder|not sure|how do i|how to|why)/i.test(lower)) return "Confused";
+  if (issueType === "Inquiry" || /\?/.test(lower)) return "Curious";
+  return "Calm";
+}
+
+function extractTags(text, module, issueType) {
+  const lower = text.toLowerCase();
+  const tags = new Set([module, issueType].filter(Boolean));
+  const tagRules = [
+    ["APRS", /aprs/i],
+    ["KISS TNC", /kiss|tnc/i],
+    ["Bluetooth", /bluetooth|ble/i],
+    ["CHIRP", /chirp/i],
+    ["DMR", /\bdmr\b/i],
+    ["Audio", /audio|modulation|mic|microphone|speaker|loud/i],
+    ["RF", /\brf\b|interference|noise|tx|rx|transmit|receive/i],
+    ["Firmware Update", /firmware|update|upgrade|program mode/i],
+    ["Antenna", /antenna/i],
+    ["Battery", /battery|charging|charger/i],
+    ["Amazon", /amazon/i],
+    ["Website", /website|web site|official site|retevis\.com|ailunce\.com/i],
+  ];
+  tagRules.forEach(([tag, pattern]) => {
+    if (pattern.test(lower)) tags.add(tag);
+  });
+  return [...tags].join(", ");
+}
+
+function extractUserId(text, email) {
+  const signature = text.match(/(?:best|thanks|thank you|regards|73)[,\s]+([A-Z][A-Za-z .'-]{1,40})$/i);
+  if (signature) return normalizeText(signature[1]);
+  if (email) return email.split("@")[0];
+  return "";
+}
+
+function buildKeyIssue({ detail, model, module, issueType, tags }) {
+  const clean = detail.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "").trim();
+  const sentences = clean.split(/(?<=[.!?。！？])\s+/).map(normalizeText).filter(Boolean);
+  const issueSentence =
+    sentences.find((sentence) => /(bug|problem|issue|error|fail|not work|doesn't work|cannot|can't|stuck|jump|skip|wrong|abnormal|not loud|interference|noise)/i.test(sentence)) ||
+    sentences[0] ||
+    clean;
+  const firstSentence = normalizeText(issueSentence).slice(0, 150);
+  const prefix = [model, module, issueType].filter(Boolean).join(" ");
+  return normalizeText(`${prefix}: ${firstSentence || "New user issue requires review"}`);
+}
+
+function draftChinese(detail, { model, module, issueType, tags }) {
+  const clean = normalizeText(detail);
+  if (!clean) return "";
+  const summaries = [];
+  if (model) summaries.push(`用户提到 ${model}`);
+  if (issueType === "Bug") summaries.push("反馈产品或功能存在异常");
+  if (issueType === "Inquiry") summaries.push("咨询功能使用、参数或兼容性");
+  if (issueType === "Purchase") summaries.push("咨询购买、库存或配件信息");
+  if (issueType === "Feature Request") summaries.push("提出功能新增或改进需求");
+  if (issueType === "After-sales") summaries.push("需要售后、订单、退换或维修处理");
+  if (module) summaries.push(`相关模块为 ${module}`);
+  return `${summaries.join("，")}。原文：${clean}`;
+}
+
 function googleTableToRows(table) {
   const bodyRows = (table?.rows || []).map((row) =>
     (row.c || []).map((cell) => normalizeText(cell?.f ?? cell?.v)),
@@ -618,25 +762,41 @@ function renderNewIssueHtml() {
   return `
     <div class="detail-panel__header">
       <div>
-        <div class="chips"><span>Draft</span><span>Read-only</span></div>
+        <div class="chips"><span>Draft</span><span>Auto Analyze</span></div>
         <p class="detail-kicker">New Issue</p>
         <h2>Create a new issue draft</h2>
       </div>
       <button class="close-detail" type="button" aria-label="Close detail">×</button>
     </div>
     <form class="new-issue-form">
-      <label>Raw User Feedback<textarea rows="5" placeholder="Paste the user's original words..."></textarea></label>
+      <label>Raw User Feedback<textarea name="Raw User Feedback" rows="5" placeholder="Paste the user's original words..."></textarea></label>
+      <button type="button" class="analyze-issue-button">Analyze Issue</button>
       <div class="new-issue-grid">
-        <label>Date<input type="date" /></label>
-        <label>Model<input placeholder="HA2, HA1UV, HD1..." /></label>
-        <label>Module<input placeholder="Firmware, CPS, Hardware..." /></label>
+        <label>Date<input name="Date" type="date" /></label>
+        <label>Source<input name="Source" placeholder="Email, Facebook, Amazon..." /></label>
+        <label>Email<input name="Email" placeholder="user@example.com" /></label>
+        <label>User ID<input name="User ID" placeholder="Name or username" /></label>
+        <label>Model<input name="Model" placeholder="HA2, HA1UV, HD1..." /></label>
+        <label>Country<input name="Country" placeholder="US, UK..." /></label>
+        <label>Module<select name="Module"><option></option><option>Firmware</option><option>CPS</option><option>APP</option><option>Hardware</option><option>Other</option></select></label>
         <label>Issue Type<select name="Issue Type">${ISSUE_TYPE_OPTIONS.filter(Boolean).map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}</select></label>
-        <label>Severity<select><option>High</option><option>Medium</option><option>Low</option></select></label>
-        <label>User Emotion<select><option>Confused</option><option>Dissatisfied</option><option>Urgent</option><option>Calm</option></select></label>
-        <label>Issue Number<input placeholder="Generated after submission" /></label>
+        <label>Severity<select name="Severity"><option>High</option><option>Medium</option><option>Low</option></select></label>
+        <label>User Emotion<select name="User Emotion"><option>Calm</option><option>Dissatisfied</option><option>Confused</option><option>Urgent</option><option>Curious</option><option>Frustrated</option></select></label>
+        <label>Needs Reply<select name="Needs Reply"><option>Yes</option><option>No</option></select></label>
+        <label>Issue Progress<select name="Issue Progress"><option>New</option><option>Initial reply sent</option><option>Discussion ongoing</option><option>Closed</option><option>Archived</option></select></label>
+        <label>Handler<input name="Handler" placeholder="Julia" /></label>
+        <label>Issue Number<input name="Issue Number" placeholder="Generated after submission" /></label>
       </div>
-      <p class="drawer-note">Save to Sheet is not connected yet. This panel is ready for the next write-back step.</p>
-      <button type="button" class="disabled-action" disabled>Save to Sheet not connected</button>
+      <label>Key Issue<textarea name="Key Issue" rows="3"></textarea></label>
+      <label>Detail<textarea name="Detail" rows="4"></textarea></label>
+      <label>Chinese<textarea name="Chinese" rows="4"></textarea></label>
+      <label>Tags<input name="Tags" placeholder="Firmware, Bluetooth, APRS..." /></label>
+      <label>Suggested Reply<textarea name="Suggested Reply" rows="3"></textarea></label>
+      <label>Info Needed<textarea name="Info Needed" rows="3"></textarea></label>
+      <label>Internal Recommendation<textarea name="Internal Recommendation" rows="3"></textarea></label>
+      <label>More Info<textarea name="More Info" rows="3"></textarea></label>
+      <p class="drawer-note">Review the analyzed fields before saving.</p>
+      <button type="button" class="disabled-action" disabled>Save to Sheet</button>
     </form>
   `;
 }
@@ -672,6 +832,7 @@ function openDetailById(id) {
 
 function openNewIssue() {
   openDrawer(renderNewIssueHtml());
+  bindNewIssueEvents();
 }
 
 function openDrawer(html) {
@@ -689,6 +850,50 @@ function closeDrawer() {
   document.getElementById("detail-panel")?.classList.add("is-hidden");
   document.getElementById("detail-backdrop")?.classList.add("is-hidden");
   document.body.classList.remove("detail-open");
+}
+
+function bindNewIssueEvents() {
+  document.querySelector(".analyze-issue-button")?.addEventListener("click", () => {
+    const rawField = document.querySelector('[name="Raw User Feedback"]');
+    const rawText = rawField?.value || "";
+    if (!normalizeText(rawText)) {
+      showToast("Paste raw user feedback first.");
+      return;
+    }
+    fillNewIssueFields(analyzeRawIssue(rawText));
+    showToast("Issue draft analyzed");
+  });
+}
+
+function fillNewIssueFields(issue) {
+  const fieldMap = {
+    Date: issue.date,
+    Source: issue.source,
+    Email: issue.email,
+    "User ID": issue.userId,
+    Model: issue.model,
+    Country: issue.country,
+    Module: issue.module,
+    "Issue Type": issue.issueType,
+    Severity: issue.severity,
+    "User Emotion": issue.userEmotion,
+    "Needs Reply": issue.needsReply,
+    "Issue Progress": issue.issueProgress,
+    Handler: issue.handler,
+    "Issue Number": issue.issueNumber,
+    "Key Issue": issue.keyIssue,
+    Detail: issue.detail,
+    Chinese: issue.chinese,
+    Tags: issue.tags,
+    "Suggested Reply": issue.suggestedReply,
+    "Info Needed": issue.infoNeeded,
+    "Internal Recommendation": issue.internalRecommendation,
+    "More Info": issue.moreInfo,
+  };
+  Object.entries(fieldMap).forEach(([name, value]) => {
+    const field = document.querySelector(`[name="${CSS.escape(name)}"]`);
+    if (field) field.value = value || "";
+  });
 }
 
 function detailFieldValues() {
@@ -932,6 +1137,7 @@ function bindEvents() {
 }
 
 const JuliaIssueTracker = {
+  analyzeRawIssue,
   changedIssueFields,
   deriveStatus,
   editableIssueValues,
