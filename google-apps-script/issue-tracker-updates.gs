@@ -163,7 +163,8 @@ function createIssue(sheetName, values, authToken) {
     return normalizedValues[header] || "";
   });
 
-  const rowNumber = Math.max(sheet.getLastRow() + 1, 3);
+  const rowNumber = 3;
+  sheet.insertRowsBefore(rowNumber, 1);
   sheet.getRange(rowNumber, 1, 1, rowValues.length).setValues([rowValues]).setWrap(true).setVerticalAlignment("top");
 
   return {
