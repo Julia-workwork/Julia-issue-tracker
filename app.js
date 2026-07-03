@@ -42,6 +42,30 @@ const EDITABLE_FIELD_DEFS = [
 ];
 
 const FIELD_TO_RECORD_KEY = Object.fromEntries(EDITABLE_FIELD_DEFS.map((field) => [field.header, field.key]));
+const NEW_ISSUE_FIELD_HEADERS = [
+  "Date",
+  "Source",
+  "Email",
+  "User ID",
+  "Model",
+  "Country",
+  "Module",
+  "Issue Type",
+  "Severity",
+  "User Emotion",
+  "Needs Reply",
+  "Issue Progress",
+  "Handler",
+  "Issue Number",
+  "Key Issue",
+  "Detail",
+  "Chinese",
+  "Tags",
+  "Suggested Reply",
+  "Info Needed",
+  "Internal Recommendation",
+  "More Info",
+];
 
 let allIssues = [];
 let summaryFilter = "all";
@@ -282,6 +306,21 @@ function changedIssueFields(record, currentValues) {
     }
     return changes;
   }, {});
+}
+
+function newIssueValuesFromFormData(formValues) {
+  return NEW_ISSUE_FIELD_HEADERS.reduce((values, header) => {
+    if (Object.prototype.hasOwnProperty.call(formValues, header)) {
+      values[header] = normalizeText(formValues[header]);
+    }
+    return values;
+  }, {});
+}
+
+function targetSheetNameForIssue(values) {
+  const year = parseDateKey(values.Date).slice(0, 4);
+  if (SHEET_NAMES.includes(year)) return year;
+  return SHEET_NAMES[0];
 }
 
 function updateIssueRecordLocally(record, { changes = {}, result = {} } = {}) {
@@ -779,9 +818,9 @@ function renderNewIssueHtml() {
         <label>Model<input name="Model" placeholder="HA2, HA1UV, HD1..." /></label>
         <label>Country<input name="Country" placeholder="US, UK..." /></label>
         <label>Module<select name="Module"><option></option><option>Firmware</option><option>CPS</option><option>APP</option><option>Hardware</option><option>Other</option></select></label>
-        <label>Issue Type<select name="Issue Type">${ISSUE_TYPE_OPTIONS.filter(Boolean).map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}</select></label>
-        <label>Severity<select name="Severity"><option>High</option><option>Medium</option><option>Low</option></select></label>
-        <label>User Emotion<select name="User Emotion"><option>Calm</option><option>Dissatisfied</option><option>Confused</option><option>Urgent</option><option>Curious</option><option>Frustrated</option></select></label>
+        <label>Issue Type<select name="Issue Type">${ISSUE_TYPE_OPTIONS.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type || "-")}</option>`).join("")}</select></label>
+        <label>Severity<select name="Severity"><option></option><option>High</option><option>Medium</option><option>Low</option></select></label>
+        <label>User Emotion<select name="User Emotion"><option></option><option>Calm</option><option>Dissatisfied</option><option>Confused</option><option>Urgent</option><option>Curious</option><option>Frustrated</option></select></label>
         <label>Needs Reply<select name="Needs Reply"><option>Yes</option><option>No</option></select></label>
         <label>Issue Progress<select name="Issue Progress"><option>New</option><option>Initial reply sent</option><option>Discussion ongoing</option><option>Closed</option><option>Archived</option></select></label>
         <label>Handler<input name="Handler" placeholder="Julia" /></label>
@@ -795,8 +834,8 @@ function renderNewIssueHtml() {
       <label>Info Needed<textarea name="Info Needed" rows="3"></textarea></label>
       <label>Internal Recommendation<textarea name="Internal Recommendation" rows="3"></textarea></label>
       <label>More Info<textarea name="More Info" rows="3"></textarea></label>
-      <p class="drawer-note">Review the analyzed fields before saving.</p>
-      <button type="button" class="disabled-action" disabled>Save to Sheet</button>
+      <p class="drawer-note">Analyze the raw text or fill Key Issue and Detail before saving.</p>
+      <button type="button" class="save-new-issue">Save to Sheet</button>
     </form>
   `;
 }
@@ -863,6 +902,29 @@ function bindNewIssueEvents() {
     fillNewIssueFields(analyzeRawIssue(rawText));
     showToast("Issue draft analyzed");
   });
+
+  document.querySelector(".save-new-issue")?.addEventListener("click", async () => {
+    const values = newIssueFieldValues();
+    if (!values["Key Issue"] || !values.Detail) {
+      showToast("Analyze or enter Key Issue and Detail first.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Create new issue in ${targetSheetNameForIssue(values)} sheet?`);
+    if (!confirmed) return;
+
+    setNewIssueSaving(true);
+    try {
+      await createIssueInGoogleSheet(values);
+      closeDrawer();
+      await loadIssues();
+      showToast("New issue saved");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Create failed");
+    } finally {
+      setNewIssueSaving(false);
+    }
+  });
 }
 
 function fillNewIssueFields(issue) {
@@ -891,9 +953,25 @@ function fillNewIssueFields(issue) {
     "More Info": issue.moreInfo,
   };
   Object.entries(fieldMap).forEach(([name, value]) => {
-    const field = document.querySelector(`[name="${CSS.escape(name)}"]`);
+    const field = namedFormField(name);
     if (field) field.value = value || "";
   });
+}
+
+function namedFormField(name) {
+  const panel = document.getElementById("detail-panel") || document;
+  return [...panel.querySelectorAll("[name]")].find((field) => field.name === name);
+}
+
+function newIssueFieldValues() {
+  const form = document.querySelector(".new-issue-form");
+  if (!form) return {};
+  const values = {};
+  form.querySelectorAll("input, select, textarea").forEach((field) => {
+    if (field.name === "Raw User Feedback") return;
+    values[field.name] = normalizeText(field.value);
+  });
+  return newIssueValuesFromFormData(values);
 }
 
 function detailFieldValues() {
@@ -1004,6 +1082,41 @@ async function syncIssueChangesToGoogleSheet(record, changes) {
     }
     throw error;
   }
+}
+
+async function createIssueInGoogleSheet(values) {
+  if (!GOOGLE_APPS_SCRIPT_URL) {
+    throw new Error("Google Apps Script URL is not configured yet.");
+  }
+  const authToken = await ensureAuthToken();
+  try {
+    return await callAppsScript({
+      action: "createIssue",
+      authToken,
+      sheetName: targetSheetNameForIssue(values),
+      values: JSON.stringify(values),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/session|permission|invalid account|password|sign in/i.test(message)) {
+      window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    }
+    throw error;
+  }
+}
+
+function setNewIssueSaving(isSaving) {
+  const form = document.querySelector(".new-issue-form");
+  const button = form?.querySelector(".save-new-issue");
+  const fields = form?.querySelectorAll("input, select, textarea, button") || [];
+  if (button) {
+    button.disabled = isSaving;
+    button.textContent = isSaving ? "Saving..." : "Save to Sheet";
+  }
+  fields.forEach((field) => {
+    if (field.classList?.contains("close-detail")) return;
+    field.disabled = isSaving;
+  });
 }
 
 async function ensureAuthToken() {
@@ -1150,7 +1263,9 @@ const JuliaIssueTracker = {
   renderIssueCard,
   renderDetailHtml,
   renderNewIssueHtml,
+  newIssueValuesFromFormData,
   summarizeIssues,
+  targetSheetNameForIssue,
   updateIssueRecordLocally,
   uniqueOptions,
 };

@@ -57,6 +57,11 @@ function doGet(e) {
       return jsonp(callback, updateIssueFields(match, changes, e.parameter.authToken));
     }
 
+    if (e.parameter.action === "createIssue") {
+      const values = JSON.parse(e.parameter.values || "{}");
+      return jsonp(callback, createIssue(e.parameter.sheetName, values, e.parameter.authToken));
+    }
+
     return jsonp(callback, { ok: false, message: "Unknown action." });
   } catch (error) {
     return jsonp(callback, { ok: false, message: error.message || "Unknown error." });
@@ -121,6 +126,54 @@ function updateIssueFields(match, changes, authToken) {
     lastModifiedAt: modifiedAt,
     lastModifiedBy: modifiedBy,
     editLog,
+  };
+}
+
+function createIssue(sheetName, values, authToken) {
+  const session = requireEditor(authToken);
+  const cleanSheetName = String(sheetName || SHEET_NAMES[0]).trim();
+  if (!SHEET_NAMES.includes(cleanSheetName)) {
+    throw new Error("Invalid target sheet.");
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(cleanSheetName);
+  if (!sheet) {
+    throw new Error(`Sheet not found: ${cleanSheetName}`);
+  }
+
+  const existingValues = sheet.getDataRange().getDisplayValues();
+  if (!existingValues.length) {
+    throw new Error("Sheet is empty.");
+  }
+
+  const headers = ensureAuditHeaders(sheet, existingValues[0].map((value) => String(value || "").trim()));
+  const headerMap = createHeaderMap(headers);
+  const normalizedValues = normalizeChanges(values);
+  if (!normalizedValues["Key Issue"] && !normalizedValues.Detail) {
+    throw new Error("Review and analyze fields before saving.");
+  }
+
+  const modifiedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+  const modifiedBy = `${session.username} (${session.role})`;
+  const rowValues = headers.map((header) => {
+    if (header === LAST_MODIFIED_AT_HEADER) return modifiedAt;
+    if (header === LAST_MODIFIED_BY_HEADER) return modifiedBy;
+    if (header === EDIT_LOG_HEADER) return `${modifiedAt} · ${modifiedBy}: Created issue`;
+    return normalizedValues[header] || "";
+  });
+
+  const rowNumber = Math.max(sheet.getLastRow() + 1, 3);
+  sheet.getRange(rowNumber, 1, 1, rowValues.length).setValues([rowValues]).setWrap(true).setVerticalAlignment("top");
+
+  return {
+    ok: true,
+    row: rowNumber,
+    sheetName: cleanSheetName,
+    changes: normalizedValues,
+    lastModifiedAt: modifiedAt,
+    lastModifiedBy: modifiedBy,
+    editLog: rowValues[headerMap[EDIT_LOG_HEADER]],
   };
 }
 
