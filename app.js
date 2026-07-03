@@ -1090,7 +1090,7 @@ async function createIssueInGoogleSheet(values) {
   }
   const authToken = await ensureAuthToken();
   try {
-    return await callAppsScript({
+    return await callAppsScriptPost({
       action: "createIssue",
       authToken,
       sheetName: targetSheetNameForIssue(values),
@@ -1180,6 +1180,56 @@ function callAppsScript(params) {
     };
     script.src = url.toString();
     document.head.appendChild(script);
+  });
+}
+
+function callAppsScriptPost(params) {
+  return new Promise((resolve, reject) => {
+    const callbackId = `juliaIssuePost_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const frameName = `${callbackId}_frame`;
+    const iframe = document.createElement("iframe");
+    const form = document.createElement("form");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Save request timed out."));
+    }, 30000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", handleMessage);
+      form.remove();
+      iframe.remove();
+    }
+
+    function handleMessage(event) {
+      const data = event.data || {};
+      if (data.source !== "juliaIssueTrackerAppsScript" || data.callbackId !== callbackId) return;
+      cleanup();
+      if (!data.payload?.ok) {
+        reject(new Error(data.payload?.message || "Save failed."));
+        return;
+      }
+      resolve(data.payload);
+    }
+
+    window.addEventListener("message", handleMessage);
+    iframe.name = frameName;
+    iframe.className = "hidden-submit-frame";
+    form.method = "post";
+    form.action = GOOGLE_APPS_SCRIPT_URL;
+    form.target = frameName;
+    form.className = "hidden-submit-form";
+
+    Object.entries({ ...params, callbackId }).forEach(([key, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    document.body.append(iframe, form);
+    form.submit();
   });
 }
 

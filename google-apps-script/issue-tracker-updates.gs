@@ -68,6 +68,21 @@ function doGet(e) {
   }
 }
 
+function doPost(e) {
+  const callbackId = e.parameter.callbackId || "";
+
+  try {
+    if (e.parameter.action === "createIssue") {
+      const values = JSON.parse(e.parameter.values || "{}");
+      return postMessageResponse(callbackId, createIssue(e.parameter.sheetName, values, e.parameter.authToken));
+    }
+
+    return postMessageResponse(callbackId, { ok: false, message: "Unknown action." });
+  } catch (error) {
+    return postMessageResponse(callbackId, { ok: false, message: error.message || "Unknown error." });
+  }
+}
+
 function updateIssueFields(match, changes, authToken) {
   const session = requireEditor(authToken);
   const sheetName = String(match.year || "").trim();
@@ -334,4 +349,14 @@ function normalize(value) {
 function jsonp(callback, payload) {
   const safeCallback = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(callback) ? callback : "callback";
   return ContentService.createTextOutput(`${safeCallback}(${JSON.stringify(payload)});`).setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function postMessageResponse(callbackId, payload) {
+  const message = {
+    source: "juliaIssueTrackerAppsScript",
+    callbackId: String(callbackId || ""),
+    payload,
+  };
+  const json = JSON.stringify(message).replace(/</g, "\\u003c");
+  return HtmlService.createHtmlOutput(`<script>window.parent.postMessage(${json}, "*");</script>`);
 }
