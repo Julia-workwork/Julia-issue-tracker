@@ -916,7 +916,6 @@ function bindNewIssueEvents() {
     setNewIssueSaving(true);
     try {
       await createIssueInGoogleSheet(values);
-      closeDrawer();
       await loadIssues();
       showToast("New issue saved");
     } catch (error) {
