@@ -15,6 +15,21 @@ const STATUSES = [
 
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
 const ISSUE_TYPE_OPTIONS = ["", "Bug", "Inquiry", "Purchase", "Feature Request", "After-sales"];
+const KNOWN_MODEL_OPTIONS = [
+  "A3",
+  "DM-32UV",
+  "EZTalk65",
+  "H1",
+  "H103",
+  "H103ML",
+  "HA1G",
+  "HA1UV",
+  "HA2",
+  "HD1",
+  "HD2",
+  "MA1",
+  "RA89",
+];
 
 const EDITABLE_FIELD_DEFS = [
   { header: "Date", key: "date", type: "input", inputType: "text" },
@@ -207,7 +222,7 @@ function filterIssues(records, filters = {}) {
 
   return records.filter((record) => {
     if (isConcrete(filters.year, "All Years") && record.year !== filters.year) return false;
-    if (isConcrete(filters.model, "All Models") && record.model !== filters.model) return false;
+    if (isConcrete(filters.model, "All Models") && !recordMatchesModel(record, filters.model)) return false;
     if (isConcrete(filters.module, "All Modules") && record.module !== filters.module) return false;
     if (isConcrete(filters.severity, "All Severity") && record.severity !== filters.severity) return false;
     if (!isWithinDateRange(record.date, filters.dateFrom, filters.dateTo)) return false;
@@ -270,6 +285,35 @@ function uniqueOptions(records, field) {
   return [...new Set(records.map((record) => normalizeText(record[field])).filter(Boolean))].sort(
     (a, b) => a.localeCompare(b, "en", { numeric: true }),
   );
+}
+
+function modelOptions(records) {
+  return [
+    ...new Set(records.flatMap((record) => canonicalModels(record.model))),
+  ].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+}
+
+function canonicalModels(value) {
+  const normalized = normalizeModelText(value);
+  if (!normalized) return [];
+  return KNOWN_MODEL_OPTIONS.filter((model) => modelPattern(model).test(normalized));
+}
+
+function normalizeModelText(value) {
+  return normalizeText(value)
+    .replace(/[，、]/g, ",")
+    .replace(/\bUV\b/gi, "HA1UV")
+    .replace(/\bDM\s*32UV\b/gi, "DM-32UV")
+    .toUpperCase();
+}
+
+function modelPattern(model) {
+  const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\\-", "[- ]?");
+  return new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`, "i");
+}
+
+function recordMatchesModel(record, selectedModel) {
+  return canonicalModels(record.model).includes(selectedModel);
 }
 
 function formatPercent(count, total) {
@@ -606,7 +650,7 @@ async function loadIssues() {
 
 function populateFilters(records) {
   renderSelect("year-filter", ["2026", "2025"], "All Years");
-  renderSelect("model-filter", uniqueOptions(records, "model"), "All Models");
+  renderSelect("model-filter", modelOptions(records), "All Models");
   renderSelect("module-filter", uniqueOptions(records, "module"), "All Modules");
   renderSelect("severity-filter", uniqueOptions(records, "severity"), "All Severity");
 }
@@ -1279,6 +1323,7 @@ const JuliaIssueTracker = {
   formatPercent,
   googleTableToRows,
   mergeSheetResults,
+  modelOptions,
   normalizeRows,
   renderIssueCard,
   renderDetailHtml,
