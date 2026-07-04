@@ -1,14 +1,17 @@
 # Julia's Issue Tracker
 
-Official static web output for the HAM user issue tracking dashboard.
+Public GitHub Pages build for Julia's HAM user issue tracking dashboard.
 
-Open `index.html` in a browser to view the page.
+Expected public URL:
+
+`https://julia-workwork.github.io/Julia-issue-tracker/`
 
 Current status:
 - Static HTML/CSS/JavaScript web page.
 - Google Sheet live read-only data is connected.
 - Reads the `2026` and `2025` tabs from `HAM User Issue`.
 - Detail cards are editable in the browser.
+- New Issue saves are connected and insert new rows at the top of the target year sheet.
 - Writing edits back to Google Sheet uses `google-apps-script/issue-tracker-updates.gs`.
 - Deploy the Apps Script as a web app, then paste its `/exec` URL into `GOOGLE_APPS_SCRIPT_URL` in `app.js`.
 - `preview.png` is the latest visual screenshot.
