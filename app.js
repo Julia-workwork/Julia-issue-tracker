@@ -69,6 +69,7 @@ const NEW_ISSUE_FIELD_HEADERS = [
 
 let allIssues = [];
 let summaryFilter = "all";
+let pendingIssueRefresh = false;
 let activeFilters = {
   year: "All Years",
   model: "All Models",
@@ -889,6 +890,10 @@ function closeDrawer() {
   document.getElementById("detail-panel")?.classList.add("is-hidden");
   document.getElementById("detail-backdrop")?.classList.add("is-hidden");
   document.body.classList.remove("detail-open");
+  if (pendingIssueRefresh) {
+    pendingIssueRefresh = false;
+    loadIssues();
+  }
 }
 
 function bindNewIssueEvents() {
@@ -916,7 +921,7 @@ function bindNewIssueEvents() {
     setNewIssueSaving(true);
     try {
       await createIssueInGoogleSheet(values);
-      await loadIssues();
+      pendingIssueRefresh = true;
       showToast("New issue saved");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Create failed");
