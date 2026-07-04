@@ -69,17 +69,15 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const callbackId = e.parameter.callbackId || "";
-
   try {
     if (e.parameter.action === "createIssue") {
       const values = JSON.parse(e.parameter.values || "{}");
-      return postMessageResponse(callbackId, createIssue(e.parameter.sheetName, values, e.parameter.authToken));
+      return jsonResponse(createIssue(e.parameter.sheetName, values, e.parameter.authToken));
     }
 
-    return postMessageResponse(callbackId, { ok: false, message: "Unknown action." });
+    return jsonResponse({ ok: false, message: "Unknown action." });
   } catch (error) {
-    return postMessageResponse(callbackId, { ok: false, message: error.message || "Unknown error." });
+    return jsonResponse({ ok: false, message: error.message || "Unknown error." });
   }
 }
 
@@ -351,12 +349,6 @@ function jsonp(callback, payload) {
   return ContentService.createTextOutput(`${safeCallback}(${JSON.stringify(payload)});`).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
-function postMessageResponse(callbackId, payload) {
-  const message = {
-    source: "juliaIssueTrackerAppsScript",
-    callbackId: String(callbackId || ""),
-    payload,
-  };
-  const json = JSON.stringify(message).replace(/</g, "\\u003c");
-  return HtmlService.createHtmlOutput(`<script>window.parent.postMessage(${json}, "*");</script>`);
+function jsonResponse(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 }

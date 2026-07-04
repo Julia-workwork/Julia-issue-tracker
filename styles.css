@@ -929,11 +929,6 @@ select {
   transform: translateY(0);
 }
 
-.hidden-submit-frame,
-.hidden-submit-form {
-  display: none;
-}
-
 .new-issue-form {
   display: grid;
   gap: 16px;
