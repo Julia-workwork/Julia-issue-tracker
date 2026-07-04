@@ -744,8 +744,9 @@ select {
 
 .detail-list {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 14px;
+  row-gap: 0;
   margin: 0;
 }
 
@@ -758,10 +759,7 @@ select {
 }
 
 .detail-editable-row:not(.detail-row-wide) {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  align-items: center;
-  column-gap: 10px;
+  display: block;
 }
 
 .detail-row-wide {
@@ -776,7 +774,7 @@ select {
 }
 
 .detail-list dd {
-  margin: 0;
+  margin: 5px 0 0;
   color: #20242c;
   font-size: 15px;
   font-weight: 760;
