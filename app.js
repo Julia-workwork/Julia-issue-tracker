@@ -1169,7 +1169,14 @@ function setNewIssueSaving(isSaving) {
 
 async function ensureAuthToken() {
   const existing = window.localStorage?.getItem(AUTH_TOKEN_KEY);
-  if (existing) return existing;
+  if (existing) {
+    try {
+      await callAppsScript({ action: "session", authToken: existing });
+      return existing;
+    } catch (error) {
+      window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    }
+  }
 
   const username = window.prompt("Issue Tracker Account (not Google)");
   if (!username) throw new Error("Account is required.");
