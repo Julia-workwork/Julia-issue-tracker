@@ -984,9 +984,10 @@ function bindNewIssueEvents() {
 
     setNewIssueSaving(true);
     try {
-      await createIssueInGoogleSheet(values);
-      pendingIssueRefresh = true;
-      showToast("New issue saved");
+      const result = await createIssueInGoogleSheet(values);
+      addOptimisticIssueRecord(result.record);
+      pendingIssueRefresh = result.verified;
+      showToast(result.verified ? "New issue saved" : "New issue saved. Shown locally until next sync.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Create failed");
     } finally {
@@ -1158,6 +1159,7 @@ async function createIssueInGoogleSheet(values) {
   }
   const authToken = await ensureAuthToken();
   const sheetName = targetSheetNameForIssue(values);
+  const optimisticRecord = optimisticIssueRecordFromValues(values, sheetName);
   try {
     await callAppsScriptPost({
       action: "createIssue",
@@ -1165,11 +1167,16 @@ async function createIssueInGoogleSheet(values) {
       sheetName,
       values: JSON.stringify(values),
     });
-    const records = await loadSheetForSaveVerification(sheetName);
-    if (!recordsContainIssue(records, values)) {
-      throw new Error("Issue was not found in Google Sheet after saving. Check Apps Script deployment and permissions.");
+    try {
+      const records = await loadSheetForSaveVerification(sheetName);
+      if (!recordsContainIssue(records, values)) {
+        return { ok: true, verified: false, record: optimisticRecord };
+      }
+      return { ok: true, verified: true, record: optimisticRecord };
+    } catch (verificationError) {
+      console.warn("Issue was sent to Google Sheet, but the sheet could not be reloaded.", verificationError);
+      return { ok: true, verified: false, record: optimisticRecord };
     }
-    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/session|permission|invalid account|password|sign in/i.test(message)) {
@@ -1177,6 +1184,62 @@ async function createIssueInGoogleSheet(values) {
     }
     throw error;
   }
+}
+
+function optimisticIssueRecordFromValues(values, sheetName = targetSheetNameForIssue(values)) {
+  const record = {
+    id: `${sheetName}-new-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    year: sheetName,
+    rowNumber: 3,
+    date: normalizeText(values.Date),
+    source: normalizeText(values.Source),
+    email: normalizeText(values.Email),
+    userId: normalizeText(values["User ID"]),
+    model: normalizeText(values.Model),
+    country: normalizeText(values.Country),
+    module: normalizeText(values.Module),
+    keyIssue: normalizeText(values["Key Issue"]),
+    detail: normalizeText(values.Detail),
+    chinese: normalizeText(values.Chinese),
+    issueType: normalizeText(values["Issue Type"]),
+    firmwareVersion: "",
+    appCpsVersion: "",
+    severity: normalizeText(values.Severity),
+    userEmotion: normalizeText(values["User Emotion"]),
+    needsReply: normalizeText(values["Needs Reply"]),
+    suggestedReply: normalizeText(values["Suggested Reply"]),
+    infoNeeded: normalizeText(values["Info Needed"]),
+    internalRecommendation: normalizeText(values["Internal Recommendation"]),
+    responseDate: normalizeText(values["Response Date"]),
+    issueProgress: normalizeText(values["Issue Progress"]),
+    handler: normalizeText(values.Handler),
+    communicationProgress: normalizeText(values["Communication Progress"]),
+    moreInfo: normalizeText(values["More Info"]),
+    issueNumber: normalizeText(values["Issue Number"]),
+    tags: normalizeText(values.Tags),
+    lastModifiedAt: "",
+    lastModifiedBy: "",
+    editLog: "Pending next sheet sync.",
+    isOptimistic: true,
+  };
+  record.status = deriveStatusFromFields(record.issueProgress, record.issueNumber);
+  return record;
+}
+
+function addOptimisticIssueRecord(record) {
+  if (!record) return;
+  const exists = allIssues.some(
+    (issue) =>
+      issue.year === record.year &&
+      normalizeText(issue.date) === normalizeText(record.date) &&
+      normalizeText(issue.keyIssue) === normalizeText(record.keyIssue) &&
+      normalizeText(issue.detail) === normalizeText(record.detail),
+  );
+  if (!exists) {
+    allIssues = [record, ...allIssues];
+  }
+  populateFilters(allIssues);
+  render();
 }
 
 function recordsContainIssue(records, values) {
@@ -1375,6 +1438,7 @@ const JuliaIssueTracker = {
   renderDetailHtml,
   renderNewIssueHtml,
   newIssueValuesFromFormData,
+  optimisticIssueRecordFromValues,
   summarizeIssues,
   targetSheetNameForIssue,
   updateIssueRecordLocally,
