@@ -1167,16 +1167,7 @@ async function createIssueInGoogleSheet(values) {
       sheetName,
       values: JSON.stringify(values),
     });
-    try {
-      const records = await loadSheetForSaveVerification(sheetName);
-      if (!recordsContainIssue(records, values)) {
-        return { ok: true, verified: false, record: optimisticRecord };
-      }
-      return { ok: true, verified: true, record: optimisticRecord };
-    } catch (verificationError) {
-      console.warn("Issue was sent to Google Sheet, but the sheet could not be reloaded.", verificationError);
-      return { ok: true, verified: false, record: optimisticRecord };
-    }
+    return { ok: true, verified: false, record: optimisticRecord };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/session|permission|invalid account|password|sign in/i.test(message)) {
