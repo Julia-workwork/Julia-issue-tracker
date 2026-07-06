@@ -51,6 +51,10 @@ function doGet(e) {
       return jsonp(callback, { ok: true });
     }
 
+    if (e.parameter.action === "sheetRows") {
+      return jsonp(callback, sheetRows(e.parameter.sheetName));
+    }
+
     if (e.parameter.action === "updateIssueFields") {
       const match = JSON.parse(e.parameter.match || "{}");
       const changes = JSON.parse(e.parameter.changes || "{}");
@@ -79,6 +83,25 @@ function doPost(e) {
   } catch (error) {
     return jsonResponse({ ok: false, message: error.message || "Unknown error." });
   }
+}
+
+function sheetRows(sheetName) {
+  const cleanSheetName = String(sheetName || "").trim();
+  if (!SHEET_NAMES.includes(cleanSheetName)) {
+    throw new Error("Invalid sheet name.");
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(cleanSheetName);
+  if (!sheet) {
+    throw new Error(`Sheet not found: ${cleanSheetName}`);
+  }
+
+  return {
+    ok: true,
+    sheetName: cleanSheetName,
+    rows: sheet.getDataRange().getDisplayValues(),
+  };
 }
 
 function updateIssueFields(match, changes, authToken) {

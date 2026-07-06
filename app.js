@@ -564,9 +564,21 @@ function wait(ms) {
 function loadSheet(sheetName, attempt = 0) {
   return loadSheetOnce(sheetName, attempt).catch((error) => {
     const delay = SHEET_RETRY_DELAYS_MS[attempt];
-    if (delay === undefined) throw error;
+    if (delay === undefined) return loadSheetViaAppsScript(sheetName, error);
     return wait(delay).then(() => loadSheet(sheetName, attempt + 1));
   });
+}
+
+async function loadSheetViaAppsScript(sheetName, originalError) {
+  if (!GOOGLE_APPS_SCRIPT_URL) {
+    throw originalError || new Error("Google Apps Script URL is not configured yet.");
+  }
+  try {
+    const result = await callAppsScript({ action: "sheetRows", sheetName });
+    return normalizeRows(result.rows || [], sheetName);
+  } catch (error) {
+    throw originalError || error;
+  }
 }
 
 function loadSheetOnce(sheetName, attempt) {
@@ -1137,13 +1149,19 @@ async function createIssueInGoogleSheet(values) {
     throw new Error("Google Apps Script URL is not configured yet.");
   }
   const authToken = await ensureAuthToken();
+  const sheetName = targetSheetNameForIssue(values);
   try {
-    return await callAppsScriptPost({
+    await callAppsScriptPost({
       action: "createIssue",
       authToken,
-      sheetName: targetSheetNameForIssue(values),
+      sheetName,
       values: JSON.stringify(values),
     });
+    const records = await loadSheetViaAppsScript(sheetName);
+    if (!recordsContainIssue(records, values)) {
+      throw new Error("Issue was not found in Google Sheet after saving. Check Apps Script deployment and permissions.");
+    }
+    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/session|permission|invalid account|password|sign in/i.test(message)) {
@@ -1151,6 +1169,18 @@ async function createIssueInGoogleSheet(values) {
     }
     throw error;
   }
+}
+
+function recordsContainIssue(records, values) {
+  const keyIssue = normalizeText(values["Key Issue"]);
+  const detail = normalizeText(values.Detail);
+  const date = normalizeText(values.Date);
+  return records.some((record) => {
+    if (keyIssue && normalizeText(record.keyIssue) !== keyIssue) return false;
+    if (detail && normalizeText(record.detail) !== detail) return false;
+    if (date && normalizeText(record.date) !== date) return false;
+    return Boolean(keyIssue || detail);
+  });
 }
 
 function setNewIssueSaving(isSaving) {
@@ -1332,6 +1362,7 @@ const JuliaIssueTracker = {
   mergeSheetResults,
   modelOptions,
   normalizeRows,
+  recordsContainIssue,
   renderIssueCard,
   renderDetailHtml,
   renderNewIssueHtml,
