@@ -581,6 +581,14 @@ async function loadSheetViaAppsScript(sheetName, originalError) {
   }
 }
 
+async function loadSheetForSaveVerification(sheetName) {
+  try {
+    return await loadSheetOnce(sheetName, 0);
+  } catch (publicError) {
+    return loadSheetViaAppsScript(sheetName, publicError);
+  }
+}
+
 function loadSheetOnce(sheetName, attempt) {
   return new Promise((resolve, reject) => {
     const callbackName = `__juliaIssueSheet_${sheetName}_${Date.now()}_${Math.random()
@@ -1157,7 +1165,7 @@ async function createIssueInGoogleSheet(values) {
       sheetName,
       values: JSON.stringify(values),
     });
-    const records = await loadSheetViaAppsScript(sheetName);
+    const records = await loadSheetForSaveVerification(sheetName);
     if (!recordsContainIssue(records, values)) {
       throw new Error("Issue was not found in Google Sheet after saving. Check Apps Script deployment and permissions.");
     }
