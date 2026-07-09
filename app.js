@@ -803,7 +803,7 @@ function renderDetailHtml(record) {
       ${detailRow("APP/CPS Version", record.appCpsVersion)}
       ${detailRow("Last Modified At", record.lastModifiedAt)}
       ${detailRow("Last Modified By", record.lastModifiedBy)}
-      ${detailRow("Edit Log", record.editLog, "wide")}
+      ${detailRow("Edit Log", summarizeEditLog(record.editLog), "wide")}
     </dl>
     <button class="save-detail-changes" type="button">Save Changes</button>
   `;
@@ -912,6 +912,36 @@ function detailRow(label, value, size = "") {
       <dd>${escapeHtml(value || "-")}</dd>
     </div>
   `;
+}
+
+function summarizeEditLog(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text
+    .split(/\n+/)
+    .map((line) => summarizeEditLogLine(line))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function summarizeEditLogLine(line) {
+  const text = normalizeText(line);
+  if (!text) return "";
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?\s*·\s*([^:]+):\s*(.+)$/);
+  if (!match) return text;
+
+  const [, date, time, rawUser, rawSummary] = match;
+  const user = rawUser.replace(/\s*\([^)]*\)/g, "").trim();
+  if (/^Updated\s+/i.test(rawSummary) || /^Created issue$/i.test(rawSummary)) {
+    return `${date} ${time} · ${user}: ${rawSummary}`;
+  }
+
+  const fields = rawSummary
+    .split(";")
+    .map((part) => normalizeText(part).split(":")[0].trim())
+    .filter(Boolean);
+  const uniqueFields = [...new Set(fields)];
+  return `${date} ${time} · ${user}: Updated ${uniqueFields.join(", ") || "issue"}`;
 }
 
 function bindCardEvents() {
@@ -1431,6 +1461,7 @@ const JuliaIssueTracker = {
   newIssueValuesFromFormData,
   optimisticIssueRecordFromValues,
   summarizeIssues,
+  summarizeEditLog,
   targetSheetNameForIssue,
   updateIssueRecordLocally,
   uniqueOptions,

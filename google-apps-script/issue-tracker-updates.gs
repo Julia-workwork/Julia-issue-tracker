@@ -138,7 +138,7 @@ function updateIssueFields(match, changes, authToken) {
     const oldValue = String(rowValues[columnIndex] || "").trim();
     if (normalize(oldValue) === normalize(value)) return;
     sheet.getRange(rowNumber, columnIndex + 1).setValue(value).setWrap(true).setVerticalAlignment("top");
-    summaries.push(formatEditSummary(header, oldValue, value));
+    summaries.push(formatEditSummary(header));
   });
 
   if (!summaries.length) {
@@ -150,8 +150,8 @@ function updateIssueFields(match, changes, authToken) {
   sheet.getRange(rowNumber, headerMap[LAST_MODIFIED_AT_HEADER] + 1).setValue(modifiedAt);
   sheet.getRange(rowNumber, headerMap[LAST_MODIFIED_BY_HEADER] + 1).setValue(modifiedBy);
 
-  const oldLog = String(rowValues[headerMap[EDIT_LOG_HEADER]] || "").trim();
-  const nextLog = `${modifiedAt} · ${modifiedBy}: ${summaries.join("; ")}`;
+  const oldLog = summarizeExistingEditLog(String(rowValues[headerMap[EDIT_LOG_HEADER]] || "").trim());
+  const nextLog = `${modifiedAt} · ${modifiedBy}: Updated ${summaries.join(", ")}`;
   const editLog = oldLog ? `${nextLog}\n${oldLog}` : nextLog;
   sheet.getRange(rowNumber, headerMap[EDIT_LOG_HEADER] + 1).setValue(editLog).setWrap(true).setVerticalAlignment("top");
 
@@ -245,8 +245,40 @@ function createHeaderMap(headers) {
   return map;
 }
 
-function formatEditSummary(header, oldValue, newValue) {
-  return `${header}: ${oldValue || "-"} -> ${newValue || "-"}`;
+function formatEditSummary(header) {
+  return header;
+}
+
+function summarizeExistingEditLog(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text
+    .split(/\n+/)
+    .map((line) => summarizeEditLogLine(line))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function summarizeEditLogLine(line) {
+  const text = String(line || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2})?\s*·\s*([^:]+):\s*(.+)$/);
+  if (!match) return text;
+
+  const date = match[1];
+  const time = match[2];
+  const user = match[3].replace(/\s*\([^)]*\)/g, "").trim();
+  const summary = match[4];
+  if (/^Updated\s+/i.test(summary) || /^Created issue$/i.test(summary)) {
+    return `${date} ${time} · ${user}: ${summary}`;
+  }
+
+  const fields = summary
+    .split(";")
+    .map((part) => String(part || "").trim().split(":")[0].trim())
+    .filter(Boolean);
+  const uniqueFields = fields.filter((field, index) => fields.indexOf(field) === index);
+  return `${date} ${time} · ${user}: Updated ${uniqueFields.join(", ") || "issue"}`;
 }
 
 function login(username, passwordHash) {
