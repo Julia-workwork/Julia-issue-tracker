@@ -561,11 +561,17 @@ function wait(ms) {
   });
 }
 
-function loadSheet(sheetName, attempt = 0) {
+function loadSheet(sheetName) {
+  return loadSheetViaAppsScript(sheetName).catch(() => {
+    return loadSheetFromPublicView(sheetName);
+  });
+}
+
+function loadSheetFromPublicView(sheetName, attempt = 0) {
   return loadSheetOnce(sheetName, attempt).catch((error) => {
     const delay = SHEET_RETRY_DELAYS_MS[attempt];
-    if (delay === undefined) return loadSheetViaAppsScript(sheetName, error);
-    return wait(delay).then(() => loadSheet(sheetName, attempt + 1));
+    if (delay === undefined) throw error;
+    return wait(delay).then(() => loadSheetFromPublicView(sheetName, attempt + 1));
   });
 }
 
