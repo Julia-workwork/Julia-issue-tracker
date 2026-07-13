@@ -740,6 +740,9 @@ select {
   font-size: 14px;
   font-weight: 650;
   line-height: 1.42;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detail-list {
@@ -785,6 +788,7 @@ select {
 .detail-editable-row input,
 .detail-editable-row select,
 .detail-editable-row textarea {
+  box-sizing: border-box;
   width: 100%;
   min-height: 34px;
   border: 1px solid #ccd4df;
@@ -805,6 +809,9 @@ select {
 .detail-editable-row textarea {
   resize: vertical;
   line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .detail-editable-row.detail-row-wide textarea {
