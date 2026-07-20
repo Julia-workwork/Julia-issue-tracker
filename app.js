@@ -57,6 +57,12 @@ const EDITABLE_FIELD_DEFS = [
 ];
 
 const FIELD_TO_RECORD_KEY = Object.fromEntries(EDITABLE_FIELD_DEFS.map((field) => [field.header, field.key]));
+const MULTILINE_FIELD_HEADERS = new Set([
+  ...EDITABLE_FIELD_DEFS.filter((field) => field.type === "textarea").map((field) => field.header),
+  "Raw User Feedback",
+  "Detail",
+  "Chinese",
+]);
 const NEW_ISSUE_FIELD_HEADERS = [
   "Date",
   "Source",
@@ -125,7 +131,7 @@ function normalizeRows(rows, year) {
     .map((row, index) => {
       const raw = {};
       headers.forEach((header, cellIndex) => {
-        if (header) raw[header] = normalizeText(row[cellIndex]);
+        if (header) raw[header] = normalizeFieldValue(header, row[cellIndex]);
       });
 
       const record = {
@@ -193,12 +199,12 @@ function readField(raw, row, headerMap, fallbackIndex, names) {
 
     const mappedIndex = headerMap.get(normalizeHeaderKey(name));
     if (mappedIndex !== undefined) {
-      const mappedValue = normalizeText(row[mappedIndex]);
+      const mappedValue = normalizeFieldValue(name, row[mappedIndex]);
       if (mappedValue) return mappedValue;
     }
   }
 
-  return normalizeText(row[fallbackIndex]);
+  return normalizeFieldValue(names[0], row[fallbackIndex]);
 }
 
 function normalizeHeaderKey(value) {
@@ -322,7 +328,7 @@ function formatPercent(count, total) {
 }
 
 function escapeHtml(value) {
-  return normalizeText(value).replace(/[&<>"']/g, (char) => {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
     const entities = {
       "&": "&amp;",
       "<": "&lt;",
@@ -336,7 +342,7 @@ function escapeHtml(value) {
 
 function editableIssueValues(record) {
   return EDITABLE_FIELD_DEFS.reduce((values, field) => {
-    values[field.header] = normalizeText(record[field.key]);
+    values[field.header] = normalizeFieldValue(field.header, record[field.key]);
     return values;
   }, {});
 }
@@ -345,7 +351,7 @@ function changedIssueFields(record, currentValues) {
   const original = editableIssueValues(record);
   return Object.entries(currentValues).reduce((changes, [field, value]) => {
     if (!Object.prototype.hasOwnProperty.call(original, field)) return changes;
-    const nextValue = normalizeText(value);
+    const nextValue = normalizeFieldValue(field, value);
     if ((original[field] || "") !== nextValue) {
       changes[field] = nextValue;
     }
@@ -356,7 +362,7 @@ function changedIssueFields(record, currentValues) {
 function newIssueValuesFromFormData(formValues) {
   return NEW_ISSUE_FIELD_HEADERS.reduce((values, header) => {
     if (Object.prototype.hasOwnProperty.call(formValues, header)) {
-      values[header] = normalizeText(formValues[header]);
+      values[header] = normalizeFieldValue(header, formValues[header]);
     }
     return values;
   }, {});
@@ -371,7 +377,7 @@ function targetSheetNameForIssue(values) {
 function updateIssueRecordLocally(record, { changes = {}, result = {} } = {}) {
   Object.entries(changes).forEach(([field, value]) => {
     const key = FIELD_TO_RECORD_KEY[field];
-    if (key) record[key] = normalizeText(value);
+    if (key) record[key] = normalizeFieldValue(field, value);
   });
   if (changes["Issue Progress"] !== undefined || changes["Issue Number"] !== undefined) {
     record.status = deriveStatusFromFields(record.issueProgress, record.issueNumber);
@@ -388,6 +394,20 @@ function isConcrete(value, allLabel) {
 
 function normalizeText(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeMultilineText(value) {
+  return String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t\f\v]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeFieldValue(header, value) {
+  return MULTILINE_FIELD_HEADERS.has(header) ? normalizeMultilineText(value) : normalizeText(value);
 }
 
 function splitMultiValue(value) {
@@ -840,7 +860,7 @@ function readonlyDetailBlock(label, value) {
 }
 
 function editableDetailRow(field, record) {
-  const value = normalizeText(record[field.key]);
+  const value = normalizeFieldValue(field.header, record[field.key]);
   const size = field.size === "wide" ? "detail-row-wide" : "";
   return `
     <div class="detail-editable-row ${size}">
@@ -862,7 +882,7 @@ function fieldInputHtml(field, value) {
   }
 
   if (field.type === "textarea") {
-    return `<textarea name="${escapeHtml(field.header)}" rows="${field.rows || 3}">${escapeHtml(value)}</textarea>`;
+    return `<textarea name="${escapeHtml(field.header)}" rows="${field.rows || 3}" wrap="soft">${escapeHtml(value)}</textarea>`;
   }
 
   return `<input name="${escapeHtml(field.header)}" type="${escapeHtml(field.inputType || "text")}" value="${escapeHtml(value)}" />`;
@@ -1074,7 +1094,7 @@ function newIssueFieldValues() {
   const values = {};
   form.querySelectorAll("input, select, textarea").forEach((field) => {
     if (field.name === "Raw User Feedback") return;
-    values[field.name] = normalizeText(field.value);
+    values[field.name] = normalizeFieldValue(field.name, field.value);
   });
   return newIssueValuesFromFormData(values);
 }
@@ -1089,7 +1109,7 @@ function detailFieldValues() {
       if (field.checked) values[field.name].push(normalizeText(field.value));
       return;
     }
-    values[field.name] = normalizeText(field.value);
+    values[field.name] = normalizeFieldValue(field.name, field.value);
   });
   Object.entries(values).forEach(([key, value]) => {
     if (Array.isArray(value)) values[key] = value.join(", ");
@@ -1225,23 +1245,23 @@ function optimisticIssueRecordFromValues(values, sheetName = targetSheetNameForI
     model: normalizeText(values.Model),
     country: normalizeText(values.Country),
     module: normalizeText(values.Module),
-    keyIssue: normalizeText(values["Key Issue"]),
-    detail: normalizeText(values.Detail),
-    chinese: normalizeText(values.Chinese),
+    keyIssue: normalizeFieldValue("Key Issue", values["Key Issue"]),
+    detail: normalizeFieldValue("Detail", values.Detail),
+    chinese: normalizeFieldValue("Chinese", values.Chinese),
     issueType: normalizeText(values["Issue Type"]),
     firmwareVersion: "",
     appCpsVersion: "",
     severity: normalizeText(values.Severity),
     userEmotion: normalizeText(values["User Emotion"]),
     needsReply: normalizeText(values["Needs Reply"]),
-    suggestedReply: normalizeText(values["Suggested Reply"]),
-    infoNeeded: normalizeText(values["Info Needed"]),
-    internalRecommendation: normalizeText(values["Internal Recommendation"]),
+    suggestedReply: normalizeFieldValue("Suggested Reply", values["Suggested Reply"]),
+    infoNeeded: normalizeFieldValue("Info Needed", values["Info Needed"]),
+    internalRecommendation: normalizeFieldValue("Internal Recommendation", values["Internal Recommendation"]),
     responseDate: normalizeText(values["Response Date"]),
     issueProgress: normalizeText(values["Issue Progress"]),
     handler: normalizeText(values.Handler),
-    communicationProgress: normalizeText(values["Communication Progress"]),
-    moreInfo: normalizeText(values["More Info"]),
+    communicationProgress: normalizeFieldValue("Communication Progress", values["Communication Progress"]),
+    moreInfo: normalizeFieldValue("More Info", values["More Info"]),
     issueNumber: normalizeText(values["Issue Number"]),
     tags: normalizeText(values.Tags),
     lastModifiedAt: "",
