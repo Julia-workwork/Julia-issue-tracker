@@ -56,6 +56,15 @@ const EDITABLE_FIELD_DEFS = [
   { header: "More Info", key: "moreInfo", type: "textarea", rows: 3, size: "wide" },
 ];
 
+const DETAIL_FIELD_GROUPS = [
+  { title: "Issue Summary", headers: ["Key Issue"] },
+  { title: "User Info", headers: ["Date", "Source", "Email", "User ID", "Country"] },
+  { title: "Product & Classification", headers: ["Model", "Module", "Issue Type", "Severity", "User Emotion", "Tags"] },
+  { title: "Workflow", headers: ["Needs Reply", "Response Date", "Issue Progress", "Handler", "Issue Number"] },
+  { title: "Notes", headers: ["Communication Progress", "Suggested Reply", "Info Needed", "Internal Recommendation", "More Info"] },
+];
+
+const EDITABLE_FIELD_BY_HEADER = new Map(EDITABLE_FIELD_DEFS.map((field) => [field.header, field]));
 const FIELD_TO_RECORD_KEY = Object.fromEntries(EDITABLE_FIELD_DEFS.map((field) => [field.header, field.key]));
 const MULTILINE_FIELD_HEADERS = new Set([
   ...EDITABLE_FIELD_DEFS.filter((field) => field.type === "textarea").map((field) => field.header),
@@ -823,14 +832,14 @@ function renderDetailHtml(record) {
       ${readonlyDetailBlock("Original Feedback", record.detail)}
       ${readonlyDetailBlock("Chinese", record.chinese)}
     </section>
-    <dl class="detail-list detail-edit-grid">
-      ${EDITABLE_FIELD_DEFS.map((field) => editableDetailRow(field, record)).join("")}
-      ${detailRow("Firmware Version", record.firmwareVersion)}
-      ${detailRow("APP/CPS Version", record.appCpsVersion)}
-      ${detailRow("Last Modified At", record.lastModifiedAt)}
-      ${detailRow("Last Modified By", record.lastModifiedBy)}
-      ${detailRow("Edit Log", summarizeEditLog(record.editLog), "wide")}
-    </dl>
+    ${detailEditableSections(record)}
+    ${detailStaticSection("System Info", [
+      ["Firmware Version", record.firmwareVersion],
+      ["APP/CPS Version", record.appCpsVersion],
+      ["Last Modified At", record.lastModifiedAt],
+      ["Last Modified By", record.lastModifiedBy],
+      ["Edit Log", summarizeEditLog(record.editLog), "wide"],
+    ])}
     <button class="save-detail-changes" type="button">Save Changes</button>
   `;
 }
@@ -856,6 +865,35 @@ function readonlyDetailBlock(label, value) {
       <h3>${escapeHtml(label)}</h3>
       <p>${escapeHtml(value || "-")}</p>
     </article>
+  `;
+}
+
+function detailEditableSections(record) {
+  return DETAIL_FIELD_GROUPS.map((group) => {
+    const rows = group.headers
+      .map((header) => EDITABLE_FIELD_BY_HEADER.get(header))
+      .filter(Boolean)
+      .map((field) => editableDetailRow(field, record))
+      .join("");
+
+    return detailSection(group.title, rows);
+  }).join("");
+}
+
+function detailStaticSection(title, rows) {
+  const html = rows.map(([label, value, size]) => detailRow(label, value, size)).join("");
+  return detailSection(title, html);
+}
+
+function detailSection(title, rowsHtml) {
+  if (!rowsHtml) return "";
+  return `
+    <section class="detail-field-section">
+      <h3 class="detail-section-title">${escapeHtml(title)}</h3>
+      <dl class="detail-list detail-edit-grid">
+        ${rowsHtml}
+      </dl>
+    </section>
   `;
 }
 
