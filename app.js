@@ -17,17 +17,10 @@ const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label
 const ISSUE_TYPE_OPTIONS = ["", "Bug", "Inquiry", "Purchase", "Feature Request", "After-sales"];
 const ISSUE_PROGRESS_OPTIONS = [
   "",
-  "New",
   "Initial reply sent",
-  "Waiting for user",
-  "Need more info",
+  "Forwarded",
   "Discussion ongoing",
-  "Reported to engineer",
-  "Engineer checking",
-  "Fix planned",
   "Closed",
-  "Fixed / Closed",
-  "Archived",
 ];
 const KNOWN_MODEL_OPTIONS = [
   "A3",
@@ -135,10 +128,10 @@ function deriveStatusFromProgress(value) {
 function deriveStatusFromFields(progressValue, issueNumberValue) {
   const progress = normalizeText(progressValue).toLowerCase();
   const issueNumber = normalizeText(issueNumberValue);
-  if (["discussion ongoing", "waiting for user", "need more info", "reported to engineer", "engineer checking", "fix planned"].includes(progress)) {
+  if (["discussion ongoing", "forwarded"].includes(progress)) {
     return "progress";
   }
-  if (progress === "closed" || progress === "fixed / closed") return "resolved";
+  if (progress === "closed") return "resolved";
   if (progress === "archived") return "archived";
   if (progress === "initial reply sent") return "submitted";
   if (/\d/.test(issueNumber)) return "submitted";
@@ -1253,12 +1246,13 @@ async function syncIssueChangesToGoogleSheet(record, changes) {
   }
   const authToken = await ensureAuthToken();
   try {
-    return await callAppsScript({
+    await callAppsScriptPost({
       action: "updateIssueFields",
       authToken,
       match: JSON.stringify({ year: record.year, rowNumber: record.rowNumber }),
       changes: JSON.stringify(changes),
     });
+    return { ok: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/session|permission|invalid account|password|sign in/i.test(message)) {

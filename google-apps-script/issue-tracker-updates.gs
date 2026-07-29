@@ -74,6 +74,12 @@ function doGet(e) {
 
 function doPost(e) {
   try {
+    if (e.parameter.action === "updateIssueFields") {
+      const match = JSON.parse(e.parameter.match || "{}");
+      const changes = JSON.parse(e.parameter.changes || "{}");
+      return jsonResponse(updateIssueFields(match, changes, e.parameter.authToken));
+    }
+
     if (e.parameter.action === "createIssue") {
       const values = JSON.parse(e.parameter.values || "{}");
       return jsonResponse(createIssue(e.parameter.sheetName, values, e.parameter.authToken));
