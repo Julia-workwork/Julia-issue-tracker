@@ -132,6 +132,7 @@ function deriveStatusFromProgress(value) {
 function deriveStatusFromFields(progressValue, issueNumberValue) {
   const progress = normalizeText(progressValue).toLowerCase();
   const issueNumber = normalizeText(issueNumberValue);
+  if (progress === "new") return "submit";
   if ([
     "waiting for user",
     "need more info",
@@ -147,7 +148,7 @@ function deriveStatusFromFields(progressValue, issueNumberValue) {
   if (progress === "archived") return "archived";
   if (progress === "initial reply sent") return "submitted";
   if (/\d/.test(issueNumber)) return "submitted";
-  if (!progress || progress === "new") return "submit";
+  if (!progress) return "submit";
   return "submit";
 }
 
