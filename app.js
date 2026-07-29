@@ -15,6 +15,20 @@ const STATUSES = [
 
 const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label]));
 const ISSUE_TYPE_OPTIONS = ["", "Bug", "Inquiry", "Purchase", "Feature Request", "After-sales"];
+const ISSUE_PROGRESS_OPTIONS = [
+  "",
+  "New",
+  "Initial reply sent",
+  "Waiting for user",
+  "Need more info",
+  "Discussion ongoing",
+  "Reported to engineer",
+  "Engineer checking",
+  "Fix planned",
+  "Closed",
+  "Fixed / Closed",
+  "Archived",
+];
 const KNOWN_MODEL_OPTIONS = [
   "A3",
   "DM-32UV",
@@ -45,7 +59,7 @@ const EDITABLE_FIELD_DEFS = [
   { header: "User Emotion", key: "userEmotion", type: "select", options: ["", "Calm", "Dissatisfied", "Confused", "Urgent", "Curious", "Frustrated"] },
   { header: "Needs Reply", key: "needsReply", type: "select", options: ["", "Yes", "No"] },
   { header: "Response Date", key: "responseDate", type: "input", inputType: "text" },
-  { header: "Issue Progress", key: "issueProgress", type: "select", options: ["", "New", "Initial reply sent", "Discussion ongoing", "Closed", "Archived"] },
+  { header: "Issue Progress", key: "issueProgress", type: "select", options: ISSUE_PROGRESS_OPTIONS },
   { header: "Handler", key: "handler", type: "input" },
   { header: "Communication Progress", key: "communicationProgress", type: "textarea", rows: 2, size: "wide" },
   { header: "Issue Number", key: "issueNumber", type: "input" },
@@ -121,8 +135,10 @@ function deriveStatusFromProgress(value) {
 function deriveStatusFromFields(progressValue, issueNumberValue) {
   const progress = normalizeText(progressValue).toLowerCase();
   const issueNumber = normalizeText(issueNumberValue);
-  if (progress === "discussion ongoing") return "progress";
-  if (progress === "closed") return "resolved";
+  if (["discussion ongoing", "waiting for user", "need more info", "reported to engineer", "engineer checking", "fix planned"].includes(progress)) {
+    return "progress";
+  }
+  if (progress === "closed" || progress === "fixed / closed") return "resolved";
   if (progress === "archived") return "archived";
   if (progress === "initial reply sent") return "submitted";
   if (/\d/.test(issueNumber)) return "submitted";
@@ -808,6 +824,8 @@ function renderIssueCard(record) {
 
 function renderDetailHtml(record) {
   const meta = [record.date, record.userId || record.handler].filter(Boolean).join(" · ");
+  const statusLabel = STATUS_LABELS.get(record.status) || "To Submit";
+  const progressLabel = normalizeText(record.issueProgress) || "New";
 
   return `
     <div class="detail-panel__header">
@@ -824,7 +842,10 @@ function renderDetailHtml(record) {
       </div>
     </div>
     <section class="detail-summary-card">
-      <span class="status-pill">${escapeHtml(STATUS_LABELS.get(record.status) || record.issueProgress || "To Submit")}</span>
+      <div class="detail-status-strip">
+        <span class="status-pill">${escapeHtml(statusLabel)}</span>
+        <span class="progress-pill"><b>Issue Progress</b>${escapeHtml(progressLabel)}</span>
+      </div>
       <h2>${escapeHtml(record.keyIssue || "Issue detail")}</h2>
       ${meta ? `<p>${escapeHtml(meta)}</p>` : ""}
     </section>
@@ -951,7 +972,7 @@ function renderNewIssueHtml() {
         <label>Severity<select name="Severity"><option></option><option>High</option><option>Medium</option><option>Low</option></select></label>
         <label>User Emotion<select name="User Emotion"><option></option><option>Calm</option><option>Dissatisfied</option><option>Confused</option><option>Urgent</option><option>Curious</option><option>Frustrated</option></select></label>
         <label>Needs Reply<select name="Needs Reply"><option>Yes</option><option>No</option></select></label>
-        <label>Issue Progress<select name="Issue Progress"><option>New</option><option>Initial reply sent</option><option>Discussion ongoing</option><option>Closed</option><option>Archived</option></select></label>
+        <label>Issue Progress<select name="Issue Progress">${ISSUE_PROGRESS_OPTIONS.map((progress) => `<option value="${escapeHtml(progress)}">${escapeHtml(progress || "-")}</option>`).join("")}</select></label>
         <label>Handler<input name="Handler" placeholder="Julia" /></label>
         <label>Issue Number<input name="Issue Number" placeholder="Generated after submission" /></label>
       </div>
