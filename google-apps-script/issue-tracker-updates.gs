@@ -7,6 +7,16 @@ const SESSION_TTL_SECONDS = 21600;
 const LAST_MODIFIED_AT_HEADER = "Last Modified At";
 const LAST_MODIFIED_BY_HEADER = "Last Modified By";
 const EDIT_LOG_HEADER = "Edit Log";
+const ISSUE_PROGRESS_OPTIONS = [
+  "New",
+  "Initial reply sent",
+  "Waiting for user",
+  "Discussion ongoing",
+  "Forwarded",
+  "Engineer checking",
+  "Closed",
+  "Archived",
+];
 const EDITABLE_HEADERS = [
   "Date",
   "Source",
@@ -135,6 +145,9 @@ function updateIssueFields(match, changes, authToken) {
   if (!Object.keys(normalizedChanges).length) {
     throw new Error("No valid changes to save.");
   }
+  if (Object.prototype.hasOwnProperty.call(normalizedChanges, "Issue Progress")) {
+    syncIssueProgressValidation(sheet, headers);
+  }
 
   const rowValues = sheet.getRange(rowNumber, 1, 1, headers.length).getDisplayValues()[0];
   const summaries = [];
@@ -195,6 +208,7 @@ function createIssue(sheetName, values, authToken) {
   if (!normalizedValues["Key Issue"] && !normalizedValues.Detail) {
     throw new Error("Review and analyze fields before saving.");
   }
+  syncIssueProgressValidation(sheet, headers);
 
   const modifiedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
   const modifiedBy = `${session.username} (${session.role})`;
@@ -249,6 +263,20 @@ function createHeaderMap(headers) {
     }
   });
   return map;
+}
+
+function syncIssueProgressValidation(sheet, headers) {
+  const headerMap = createHeaderMap(headers);
+  const columnIndex = headerMap["Issue Progress"];
+  if (columnIndex === undefined) return;
+
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(ISSUE_PROGRESS_OPTIONS, true)
+    .setAllowInvalid(false)
+    .build();
+  const firstDataRow = 3;
+  const rowCount = Math.max(sheet.getMaxRows() - firstDataRow + 1, 1);
+  sheet.getRange(firstDataRow, columnIndex + 1, rowCount, 1).setDataValidation(rule);
 }
 
 function formatEditSummary(header) {

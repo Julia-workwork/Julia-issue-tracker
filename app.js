@@ -17,10 +17,14 @@ const STATUS_LABELS = new Map(STATUSES.map((status) => [status.key, status.label
 const ISSUE_TYPE_OPTIONS = ["", "Bug", "Inquiry", "Purchase", "Feature Request", "After-sales"];
 const ISSUE_PROGRESS_OPTIONS = [
   "",
+  "New",
   "Initial reply sent",
+  "Waiting for user",
   "Forwarded",
   "Discussion ongoing",
+  "Engineer checking",
   "Closed",
+  "Archived",
 ];
 const KNOWN_MODEL_OPTIONS = [
   "A3",
@@ -128,10 +132,18 @@ function deriveStatusFromProgress(value) {
 function deriveStatusFromFields(progressValue, issueNumberValue) {
   const progress = normalizeText(progressValue).toLowerCase();
   const issueNumber = normalizeText(issueNumberValue);
-  if (["discussion ongoing", "forwarded"].includes(progress)) {
+  if ([
+    "waiting for user",
+    "need more info",
+    "discussion ongoing",
+    "forwarded",
+    "reported to engineer",
+    "engineer checking",
+    "fix planned",
+  ].includes(progress)) {
     return "progress";
   }
-  if (progress === "closed") return "resolved";
+  if (["closed", "fixed / closed"].includes(progress)) return "resolved";
   if (progress === "archived") return "archived";
   if (progress === "initial reply sent") return "submitted";
   if (/\d/.test(issueNumber)) return "submitted";
