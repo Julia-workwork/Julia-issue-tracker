@@ -803,27 +803,27 @@ function renderIssueCard(record) {
   const issueNumber = record.issueNumber
     ? `<p class="issue-number">Issue # ${escapeHtml(record.issueNumber)}</p>`
     : "";
-  const issueNumberDetail = record.issueNumber
-    ? `<dd>${escapeHtml(record.issueNumber)}</dd>`
-    : `<dd class="missing">Missing</dd>`;
   const title = record.keyIssue || "Key issue missing";
 
   return `
     <article class="issue-card feedback-card" role="button" tabindex="0" data-record-id="${escapeHtml(record.id)}" aria-label="Open issue detail">
-      <div class="chips">
-        ${record.module ? `<span>${escapeHtml(record.module)}</span>` : ""}
-        ${record.severity ? `<span class="${severityClass}">${escapeHtml(record.severity)}</span>` : ""}
-        ${record.userEmotion ? `<span>${escapeHtml(record.userEmotion)}</span>` : ""}
+      <div class="card-topline">
+        <div class="chips">
+          ${record.module ? `<span>${escapeHtml(record.module)}</span>` : ""}
+          ${record.severity ? `<span class="${severityClass}">${escapeHtml(record.severity)}</span>` : ""}
+        </div>
+        <span class="card-date">${escapeHtml(record.date || "No date")}</span>
       </div>
       <h3>${escapeHtml(title)}</h3>
       ${issueNumber}
-      <dl>
-        <div><dt>Model</dt><dd>${escapeHtml(record.model || "-")}</dd></div>
-        <div><dt>Date</dt><dd>${escapeHtml(record.date || "-")}</dd></div>
-        <div><dt>Handler</dt><dd>${escapeHtml(record.handler || "-")}</dd></div>
-        <div><dt>Issue #</dt>${issueNumberDetail}</div>
-      </dl>
-      <div class="card-actions"><span>View detail</span></div>
+      <div class="card-context">
+        <span class="model-badge">${escapeHtml(record.model || "No model")}</span>
+        ${record.userEmotion ? `<span>${escapeHtml(record.userEmotion)}</span>` : ""}
+      </div>
+      <div class="card-actions">
+        <span>${escapeHtml(record.handler || "Unassigned")}</span>
+        <strong>Open <span aria-hidden="true">↗</span></strong>
+      </div>
     </article>
   `;
 }

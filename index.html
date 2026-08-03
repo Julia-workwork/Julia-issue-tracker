@@ -3,26 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Julia's Issue Tracker</title>
-    <link rel="stylesheet" href="./styles.css?v=2026072904" />
+    <title>Julia Feedback Board</title>
+    <link rel="stylesheet" href="./styles.css?v=2026080401" />
   </head>
   <body>
     <main class="app-shell">
     <header class="hero app-header">
       <nav class="topbar" aria-label="Preview controls">
-        <span class="brand-mark">J</span>
+        <a class="brand" href="#page-title" aria-label="Julia Feedback Board home">
+          <span class="brand-mark">J</span>
+          <span class="brand-copy"><strong>Julia</strong><small>Feedback Board</small></span>
+        </a>
         <div class="top-actions">
           <span class="role-pill">Admin</span>
           <span id="sync-status" class="sync-dot is-synced">Synced</span>
-          <button id="top-refresh-button" type="button" class="ghost-button">Refresh</button>
-          <button id="new-issue-button" type="button" class="light-button">+ New Issue</button>
+          <button id="top-refresh-button" type="button" class="ghost-button">Refresh data</button>
+          <button id="new-issue-button" type="button" class="light-button"><span>+</span> Add feedback</button>
         </div>
       </nav>
 
       <section class="hero-copy" aria-labelledby="page-title">
-        <p class="eyebrow">HAM User Issue Dashboard</p>
-        <h1 id="page-title">Julia's Issue Tracker</h1>
-        <p>Track user issues from feedback to engineering resolution.</p>
+        <p class="eyebrow">Product feedback operations</p>
+        <h1 id="page-title">Turn feedback into<br /><span>forward motion.</span></h1>
+        <div class="hero-support">
+          <p>Collect, triage and follow every customer issue from first report to final resolution.</p>
+          <a href="#board">Explore board <span aria-hidden="true">↓</span></a>
+        </div>
       </section>
     </header>
 
@@ -31,10 +37,10 @@
         <section class="filters filter-bar" aria-label="Issue filters">
           <div class="filter-search-row">
           <label class="search">
-            <span>Keyword Search</span>
-            <input id="keyword-search" placeholder="Search issue, user, reply..." />
+            <span>Search feedback</span>
+            <input id="keyword-search" placeholder="Issue, user, model or reply…" />
           </label>
-          <button id="refresh-button" type="button">Refresh</button>
+          <button id="refresh-button" type="button">Apply filters</button>
           </div>
           <div class="filter-control-row">
           <label>
@@ -124,7 +130,8 @@
       <section class="workspace-section board-section">
         <div class="section-heading board-heading">
           <div>
-            <p>Workboard</p>
+            <p>Feedback workflow</p>
+            <h2>Issue board</h2>
           </div>
           <span id="showing-label">Showing 2025 + 2026</span>
         </div>
@@ -160,6 +167,6 @@
     <aside id="detail-panel" class="detail-panel is-hidden" aria-label="Issue detail"></aside>
     <button id="detail-backdrop" class="detail-backdrop is-hidden" type="button" aria-label="Close detail"></button>
     </main>
-    <script src="./app.js?v=2026072904"></script>
+    <script src="./app.js?v=2026080401"></script>
   </body>
 </html>
