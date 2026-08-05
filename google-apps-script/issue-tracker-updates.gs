@@ -123,8 +123,8 @@ function sheetRows(sheetName) {
 function updateIssueFields(match, changes, authToken) {
   const session = requireEditor(authToken);
   const sheetName = String(match.year || "").trim();
-  const rowNumber = Number(match.rowNumber);
-  if (!SHEET_NAMES.includes(sheetName) || !Number.isInteger(rowNumber) || rowNumber < 3) {
+  const requestedRowNumber = Number(match.rowNumber);
+  if (!SHEET_NAMES.includes(sheetName) || !Number.isInteger(requestedRowNumber) || requestedRowNumber < 3) {
     throw new Error("Invalid issue row identity.");
   }
 
@@ -141,6 +141,7 @@ function updateIssueFields(match, changes, authToken) {
 
   const headers = ensureAuditHeaders(sheet, values[0].map((value) => String(value || "").trim()));
   const headerMap = createHeaderMap(headers);
+  const rowNumber = resolveIssueRowNumber(values, headers, match);
   const normalizedChanges = normalizeChanges(changes);
   if (!Object.keys(normalizedChanges).length) {
     throw new Error("No valid changes to save.");
@@ -182,6 +183,48 @@ function updateIssueFields(match, changes, authToken) {
     lastModifiedBy: modifiedBy,
     editLog,
   };
+}
+
+function resolveIssueRowNumber(values, headers, match) {
+  const headerMap = createHeaderMap(headers);
+  const requestedRowNumber = Number(match.rowNumber);
+  const requestedIndex = requestedRowNumber - 1;
+  if (requestedIndex >= 2 && requestedIndex < values.length && rowMatchesIssue(values[requestedIndex], headerMap, match)) {
+    return requestedRowNumber;
+  }
+
+  const matchingRows = [];
+  for (let index = 2; index < values.length; index += 1) {
+    if (rowMatchesIssue(values[index], headerMap, match, true)) matchingRows.push(index + 1);
+  }
+  if (matchingRows.length === 1) return matchingRows[0];
+  if (matchingRows.length > 1) throw new Error("Multiple matching issues found. Refresh the dashboard before saving.");
+  throw new Error("Issue row changed or could not be found. Refresh the dashboard before saving.");
+}
+
+function rowMatchesIssue(row, headerMap, match, requireStrongIdentity) {
+  const issueNumber = cleanIdentityValue(match.issueNumber);
+  const issueNumberColumn = headerMap["Issue Number"];
+  if (issueNumber && issueNumberColumn !== undefined) {
+    return normalize(row[issueNumberColumn]) === normalize(issueNumber);
+  }
+
+  const identityFields = [
+    ["Date", match.date],
+    ["Email", match.email],
+    ["User ID", match.userId],
+    ["Model", match.model],
+    ["Key Issue", match.keyIssue],
+  ].filter(([header, value]) => headerMap[header] !== undefined && cleanIdentityValue(value));
+
+  if (!identityFields.length) return !requireStrongIdentity;
+  if (requireStrongIdentity && identityFields.length < 2) return false;
+  return identityFields.every(([header, value]) => normalize(row[headerMap[header]]) === normalize(value));
+}
+
+function cleanIdentityValue(value) {
+  const text = String(value || "").trim();
+  return !text || text === "-" || normalize(text) === "missing" ? "" : text;
 }
 
 function createIssue(sheetName, values, authToken) {

@@ -390,6 +390,43 @@ function changedIssueFields(record, currentValues) {
   }, {});
 }
 
+function issueIdentity(record) {
+  return {
+    year: record.year,
+    rowNumber: record.rowNumber,
+    date: normalizeFieldValue("Date", record.date),
+    email: normalizeFieldValue("Email", record.email),
+    userId: normalizeFieldValue("User ID", record.userId),
+    model: normalizeFieldValue("Model", record.model),
+    keyIssue: normalizeFieldValue("Key Issue", record.keyIssue),
+    issueNumber: normalizeFieldValue("Issue Number", record.issueNumber),
+  };
+}
+
+function sheetRowsConfirmIssueChanges(rows, record, changes) {
+  if (!Array.isArray(rows) || rows.length < 3) return false;
+  const headers = rows[0].map(normalizeText);
+  const headerMap = buildHeaderMap(headers);
+  const original = editableIssueValues(record);
+  const identityHeaders = ["Issue Number", "Date", "Email", "User ID", "Model", "Key Issue"];
+  const stableIdentity = identityHeaders.filter((header) => {
+    const value = original[header];
+    return value && value !== "-" && value.toLowerCase() !== "missing" && changes[header] === undefined;
+  });
+
+  return rows.slice(2).some((row) => {
+    const matchesField = ([header, expected]) => {
+      const index = headerMap.get(normalizeHeaderKey(header));
+      if (index === undefined) return false;
+      return normalizeFieldValue(header, row[index]) === normalizeFieldValue(header, expected);
+    };
+    if (stableIdentity.length && !stableIdentity.every((header) => matchesField([header, original[header]]))) {
+      return false;
+    }
+    return Object.entries(changes).every(matchesField);
+  });
+}
+
 function newIssueValuesFromFormData(formValues) {
   return NEW_ISSUE_FIELD_HEADERS.reduce((values, header) => {
     if (Object.prototype.hasOwnProperty.call(formValues, header)) {
@@ -1262,10 +1299,11 @@ async function syncIssueChangesToGoogleSheet(record, changes) {
     await callAppsScriptPost({
       action: "updateIssueFields",
       authToken,
-      match: JSON.stringify({ year: record.year, rowNumber: record.rowNumber }),
+      match: JSON.stringify(issueIdentity(record)),
       changes: JSON.stringify(changes),
     });
-    return { ok: true };
+    await verifyIssueChangesInGoogleSheet(record, changes);
+    return { ok: true, verified: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (/session|permission|invalid account|password|sign in/i.test(message)) {
@@ -1273,6 +1311,23 @@ async function syncIssueChangesToGoogleSheet(record, changes) {
     }
     throw error;
   }
+}
+
+async function verifyIssueChangesInGoogleSheet(record, changes) {
+  let lastError;
+  for (const delay of [0, 1000, 2200]) {
+    if (delay) await wait(delay);
+    try {
+      const result = await callAppsScript({ action: "sheetRows", sheetName: record.year });
+      if (sheetRowsConfirmIssueChanges(result.rows, record, changes)) return true;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError) {
+    throw new Error("The update may have been sent, but Google Sheet could not be verified. Refresh and try again.");
+  }
+  throw new Error("Google Sheet did not save these changes. Redeploy the latest Apps Script and try again.");
 }
 
 async function createIssueInGoogleSheet(values) {
@@ -1546,6 +1601,7 @@ const JuliaIssueTracker = {
   mergeSheetResults,
   modelOptions,
   normalizeRows,
+  sheetRowsConfirmIssueChanges,
   recordsContainIssue,
   renderIssueCard,
   renderDetailHtml,
