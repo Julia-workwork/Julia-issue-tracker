@@ -1319,7 +1319,10 @@ async function verifyIssueChangesInGoogleSheet(record, changes) {
   for (const delay of [0, 1000, 2200]) {
     if (delay) await wait(delay);
     try {
-      const result = await callAppsScript({ action: "sheetRows", sheetName: record.year });
+      const result = await callAppsScript({
+        action: "issueRows",
+        match: JSON.stringify(issueIdentity(record)),
+      });
       if (sheetRowsConfirmIssueChanges(result.rows, record, changes)) return true;
     } catch (error) {
       lastError = error;
@@ -1477,6 +1480,7 @@ function callAppsScript(params) {
       url.searchParams.set(key, value);
     });
     url.searchParams.set("callback", callbackName);
+    url.searchParams.set("_", `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
     const script = document.createElement("script");
     const timeout = window.setTimeout(() => {

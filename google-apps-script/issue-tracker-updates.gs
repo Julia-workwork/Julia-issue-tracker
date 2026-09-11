@@ -65,6 +65,11 @@ function doGet(e) {
       return jsonp(callback, sheetRows(e.parameter.sheetName));
     }
 
+    if (e.parameter.action === "issueRows") {
+      const match = JSON.parse(e.parameter.match || "{}");
+      return jsonp(callback, issueRows(match));
+    }
+
     if (e.parameter.action === "updateIssueFields") {
       const match = JSON.parse(e.parameter.match || "{}");
       const changes = JSON.parse(e.parameter.changes || "{}");
@@ -117,6 +122,34 @@ function sheetRows(sheetName) {
     ok: true,
     sheetName: cleanSheetName,
     rows: sheet.getDataRange().getDisplayValues(),
+  };
+}
+
+function issueRows(match) {
+  const sheetName = String(match.year || "").trim();
+  if (!SHEET_NAMES.includes(sheetName)) {
+    throw new Error("Invalid sheet name.");
+  }
+
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    throw new Error(`Sheet not found: ${sheetName}`);
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  if (!values.length) {
+    throw new Error("Sheet is empty.");
+  }
+
+  const headers = values[0].map((value) => String(value || "").trim());
+  const rowNumber = resolveIssueRowNumber(values, headers, match);
+  const rowValues = sheet.getRange(rowNumber, 1, 1, headers.length).getDisplayValues()[0];
+  return {
+    ok: true,
+    sheetName,
+    rowNumber,
+    rows: [headers, [], rowValues],
   };
 }
 
