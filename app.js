@@ -38,6 +38,7 @@ const KNOWN_MODEL_OPTIONS = [
   "HA2",
   "HD1",
   "HD2",
+  "HD2 V3",
   "MA1",
   "RA89",
   "RA89R",
@@ -346,6 +347,7 @@ function normalizeModelText(value) {
 }
 
 function modelPattern(model) {
+  if (model === "HD2") return /(^|[^A-Z0-9])HD2(?!\s+V3\b)([^A-Z0-9]|$)/i;
   const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\\-", "[- ]?");
   return new RegExp(`(^|[^A-Z0-9])${escaped}([^A-Z0-9]|$)`, "i");
 }
@@ -543,7 +545,7 @@ function extractDate(text) {
 }
 
 function extractModel(text) {
-  const match = normalizeText(text).match(/\b(HA1UV|HA1G|HA2|HD2|HD1|H1|RA89R|RA89|MA1|DM-?32UV|H103|H103ML)\b/i);
+  const match = normalizeText(text).match(/\b(HA1UV|HA1G|HA2|HD2(?: V3)?|HD1|H1|RA89R|RA89|MA1|DM-?32UV|H103|H103ML)\b/i);
   return match ? match[1].toUpperCase().replace("DM-32UV", "DM-32UV") : "";
 }
 
