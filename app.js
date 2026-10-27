@@ -27,12 +27,6 @@ const ISSUE_PROGRESS_OPTIONS = [
   "Archived",
 ];
 const KNOWN_MODEL_OPTIONS = [
-  "A3",
-  "DM-32UV",
-  "EZTalk65",
-  "H1",
-  "H103",
-  "H103ML",
   "HA1G",
   "HA1UV",
   "HA2",
@@ -42,6 +36,12 @@ const KNOWN_MODEL_OPTIONS = [
   "MA1",
   "RA89",
   "RA89R",
+  "H1",
+  "A3",
+  "EZTalk65",
+  "DM-32UV",
+  "H103",
+  "H103ML",
 ];
 
 const EDITABLE_FIELD_DEFS = [
@@ -327,9 +327,8 @@ function uniqueOptions(records, field) {
 }
 
 function modelOptions(records) {
-  return [
-    ...new Set(records.flatMap((record) => canonicalModels(record.model))),
-  ].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  const presentModels = new Set(records.flatMap((record) => canonicalModels(record.model)));
+  return KNOWN_MODEL_OPTIONS.filter((model) => presentModels.has(model));
 }
 
 function canonicalModels(value) {
