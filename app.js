@@ -256,8 +256,18 @@ function summarizeIssues(records) {
   };
 }
 
+function normalizeSearchText(value) {
+  return String(value ?? "").normalize("NFKC").toLowerCase();
+}
+
+function compactSearchText(value) {
+  return value.replace(/[\s\p{P}]+/gu, "");
+}
+
 function filterIssues(records, filters = {}) {
-  const search = normalizeText(filters.search).toLowerCase();
+  const search = normalizeSearchText(normalizeText(filters.search));
+  const compactSearch = compactSearchText(search);
+  const searchTerms = search.split(/[\s\p{P}]+/u).filter(Boolean);
 
   return records.filter((record) => {
     if (isConcrete(filters.year, "All Years") && record.year !== filters.year) return false;
@@ -267,7 +277,7 @@ function filterIssues(records, filters = {}) {
     if (!isWithinDateRange(record.date, filters.dateFrom, filters.dateTo)) return false;
     if (!search) return true;
 
-    return [
+    const searchableFields = [
       record.date,
       record.source,
       record.email,
@@ -277,16 +287,19 @@ function filterIssues(records, filters = {}) {
       record.keyIssue,
       record.detail,
       record.chinese,
+      record.communicationProgress,
       record.issueType,
       record.severity,
       record.userEmotion,
       record.handler,
       record.issueNumber,
       record.tags,
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(search);
+    ].map(normalizeSearchText);
+    const compactFields = searchableFields.map(compactSearchText);
+    return searchableFields.join(" ").includes(search)
+      || (Boolean(compactSearch) && compactFields.some((value) => value.includes(compactSearch)))
+      || (searchTerms.length > 0 && searchTerms.every((term) =>
+        compactFields.some((value) => value.includes(term))));
   });
 }
 
