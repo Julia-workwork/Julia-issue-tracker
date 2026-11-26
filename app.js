@@ -1475,8 +1475,17 @@ async function loginWithCredentials(username, password) {
     throw new Error(result.message || "Login failed.");
   }
   window.localStorage?.setItem(AUTH_TOKEN_KEY, result.token);
+  applySession(result);
   setText("sync-status", result.role ? `${result.role} Synced` : "Synced");
   return result.token;
+}
+
+function applySession(session) {
+  const role = String(session.role || "Viewer");
+  const username = String(session.username || "User");
+  const badge = document.querySelector(".role-pill");
+  if (badge) badge.textContent = `${username} · ${role}`;
+  document.body.classList.toggle("is-viewer", role.toLowerCase() === "viewer");
 }
 
 async function hashCredential(username, password) {
@@ -1658,7 +1667,8 @@ if (typeof globalThis !== "undefined") {
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   bindEvents();
   const token = window.localStorage?.getItem(AUTH_TOKEN_KEY);
-  const showDashboard = async () => {
+  const showDashboard = async (session) => {
+    applySession(session);
     const login = document.getElementById("login-screen");
     const app = document.querySelector(".app-shell");
     login?.classList.add("is-hidden");
