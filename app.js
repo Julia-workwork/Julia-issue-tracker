@@ -1590,6 +1590,10 @@ function bindEvents() {
   });
   document.getElementById("refresh-button")?.addEventListener("click", loadIssues);
   document.getElementById("top-refresh-button")?.addEventListener("click", loadIssues);
+  document.getElementById("logout-button")?.addEventListener("click", () => {
+    window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    window.location.reload();
+  });
   document.getElementById("new-issue-button")?.addEventListener("click", openNewIssue);
   document.getElementById("detail-backdrop")?.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (event) => {
