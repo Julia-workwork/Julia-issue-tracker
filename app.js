@@ -1590,9 +1590,14 @@ function bindEvents() {
   });
   document.getElementById("refresh-button")?.addEventListener("click", loadIssues);
   document.getElementById("top-refresh-button")?.addEventListener("click", loadIssues);
-  document.getElementById("logout-button")?.addEventListener("click", () => {
+  document.getElementById("logout-button")?.addEventListener("click", async () => {
     window.localStorage?.removeItem(AUTH_TOKEN_KEY);
-    window.location.reload();
+    try {
+      await ensureAuthToken();
+      window.location.reload();
+    } catch (error) {
+      showToast(error.message || "Sign in failed.");
+    }
   });
   document.getElementById("new-issue-button")?.addEventListener("click", openNewIssue);
   document.getElementById("detail-backdrop")?.addEventListener("click", closeDrawer);
