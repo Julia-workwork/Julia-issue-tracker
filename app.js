@@ -1485,6 +1485,10 @@ function applySession(session) {
   const username = String(session.username || "User");
   const badge = document.querySelector(".role-pill");
   if (badge) badge.textContent = `${username} · ${role}`;
+  const brandName = document.querySelector(".brand-copy strong");
+  if (brandName) brandName.textContent = username;
+  const brandMark = document.querySelector(".brand-mark");
+  if (brandMark) brandMark.textContent = username.charAt(0).toUpperCase();
   document.body.classList.toggle("is-viewer", role.toLowerCase() === "viewer");
 }
 
