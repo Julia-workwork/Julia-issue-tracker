@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="./styles.css?v=2026091101" />
   </head>
   <body>
+    <section id="login-screen" class="login-screen" aria-labelledby="login-title">
+      <form id="login-form" class="login-form">
+        <p class="eyebrow">Julia Feedback Board</p>
+        <h1 id="login-title">Sign in</h1>
+        <label>Account<input name="username" autocomplete="username" required /></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+        <p id="login-error" role="alert"></p>
+        <button type="submit" class="light-button">Sign in</button>
+      </form>
+    </section>
     <main class="app-shell">
     <header class="hero app-header">
       <nav class="topbar" aria-label="Preview controls">

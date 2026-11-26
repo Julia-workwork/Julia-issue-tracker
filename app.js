@@ -1465,10 +1465,10 @@ async function ensureAuthToken() {
     }
   }
 
-  const username = window.prompt("Issue Tracker Account (not Google)");
-  if (!username) throw new Error("Account is required.");
-  const password = window.prompt("Issue Tracker Password");
-  if (!password) throw new Error("Password is required.");
+  throw new Error("Please sign in to continue.");
+}
+
+async function loginWithCredentials(username, password) {
   const passwordHash = await hashCredential(username, password);
   const result = await callAppsScript({ action: "login", username, passwordHash });
   if (!result.ok || !result.token) {
@@ -1592,11 +1592,19 @@ function bindEvents() {
   document.getElementById("top-refresh-button")?.addEventListener("click", loadIssues);
   document.getElementById("logout-button")?.addEventListener("click", async () => {
     window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    window.location.reload();
+  });
+  document.getElementById("login-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const errorElement = document.getElementById("login-error");
+    errorElement.textContent = "Signing in...";
     try {
-      await ensureAuthToken();
+      await loginWithCredentials(data.get("username"), data.get("password"));
       window.location.reload();
     } catch (error) {
-      showToast(error.message || "Sign in failed.");
+      errorElement.textContent = error.message || "Sign in failed.";
     }
   });
   document.getElementById("new-issue-button")?.addEventListener("click", openNewIssue);
@@ -1649,5 +1657,18 @@ if (typeof globalThis !== "undefined") {
 
 if (typeof window !== "undefined" && typeof document !== "undefined") {
   bindEvents();
-  loadIssues();
+  const token = window.localStorage?.getItem(AUTH_TOKEN_KEY);
+  const showDashboard = async () => {
+    const login = document.getElementById("login-screen");
+    const app = document.querySelector(".app-shell");
+    login?.classList.add("is-hidden");
+    app?.classList.remove("is-hidden");
+    await loadIssues();
+  };
+  document.querySelector(".app-shell")?.classList.add("is-hidden");
+  if (token) {
+    callAppsScript({ action: "session", authToken: token }).then(showDashboard).catch(() => {
+      window.localStorage?.removeItem(AUTH_TOKEN_KEY);
+    });
+  }
 }

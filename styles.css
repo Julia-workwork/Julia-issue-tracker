@@ -28,6 +28,15 @@ body {
   color: var(--ink);
 }
 
+.login-screen { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: #111; color: white; }
+.login-screen.is-hidden { display: none; }
+.login-form { width: min(420px, 100%); display: grid; gap: 18px; }
+.login-form h1 { margin: 0; font-size: 32px; }
+.login-form label { display: grid; gap: 8px; font-size: 14px; font-weight: 700; }
+.login-form input { min-height: 46px; padding: 10px 12px; border: 1px solid #777; border-radius: 8px; background: #222; color: white; }
+#login-error { min-height: 20px; margin: 0; color: #ff8a80; }
+.app-shell.is-hidden { display: none; }
+
 button,
 input,
 select {
