@@ -1117,6 +1117,14 @@ function openDrawer(html) {
   const backdrop = document.getElementById("detail-backdrop");
   if (!panel || !backdrop) return;
   panel.innerHTML = html;
+  if (document.body.classList.contains("is-viewer")) {
+    panel.querySelectorAll(".detail-editable-row input, .detail-editable-row textarea").forEach((field) => {
+      field.readOnly = true;
+    });
+    panel.querySelectorAll(".detail-editable-row select").forEach((field) => {
+      field.disabled = true;
+    });
+  }
   panel.classList.remove("is-hidden");
   backdrop.classList.remove("is-hidden");
   document.body.classList.add("detail-open");
