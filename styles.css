@@ -37,9 +37,11 @@ body {
 #login-error { min-height: 20px; margin: 0; color: #ff8a80; }
 .app-shell.is-hidden { display: none; }
 body.is-viewer #new-issue-button,
-body.is-viewer .detail-editable-row,
 body.is-viewer .save-detail-changes,
 body.is-viewer .copy-detail-summary { display: none !important; }
+body.is-viewer .detail-editable-row input,
+body.is-viewer .detail-editable-row select,
+body.is-viewer .detail-editable-row textarea { pointer-events: none; }
 
 button,
 input,
