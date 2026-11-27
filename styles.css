@@ -39,8 +39,6 @@ body {
 body.is-viewer #new-issue-button,
 body.is-viewer .save-detail-changes,
 body.is-viewer .copy-detail-summary { display: none !important; }
-body.is-viewer .detail-editable-row input,
-body.is-viewer .detail-editable-row select,
 body.is-viewer .detail-editable-row textarea { field-sizing: content; min-height: 74px; resize: none; overflow: hidden; }
 
 button,
